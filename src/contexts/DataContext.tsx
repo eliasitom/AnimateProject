@@ -166,7 +166,9 @@ export const DataProvider = ({ children }: DataProviderProps) => {
 
 
   const handleUndo = () => {
-    const previousUndo = mainUndoStack[mainUndoStack.length - 1];
+    const previousUndo = mainUndoStack[mainUndoStack.length - 2];
+    console.log("previousUndo:")
+    console.log(previousUndo)
 
     if (previousUndo.undoType === "newLayer") {
       handleDeleteLayer(previousUndo.layerData.layerName)
@@ -177,6 +179,7 @@ export const DataProvider = ({ children }: DataProviderProps) => {
       const newUndoStack = mainUndoStack.slice(0, -1);
       setMainUndoStack(newUndoStack);
     } else if (previousUndo.undoType === "layerAction" && previousUndo.canvasDataURL) {
+      console.log(1)
       // Obtener el indice del canvas en canvasRefs
       console.log(mainUndoStack[mainUndoStack.length - 1])
       const layerName = previousUndo.layerData.layerName
@@ -193,21 +196,20 @@ export const DataProvider = ({ children }: DataProviderProps) => {
       if (!ctx) return;
 
       // Obtener el último objeto del stack
-      const lastUndoObj = mainUndoStack[mainUndoStack.length - 1];
-      setRedoStack([...redoStack, lastUndoObj]);
+      setRedoStack([...redoStack, previousUndo]);
 
       // Actualizar el stack de undo
-      const newUndoStack = mainUndoStack.slice(0, -1);
+      const newUndoStack = mainUndoStack.filter(elem => elem.undoObjId !== previousUndo.undoObjId);
       setMainUndoStack(newUndoStack);
 
       // Limpiar el canvas
       ctx.clearRect(0, 0, canvas.ref.current.width, canvas.ref.current.height);
 
       // Buscar el índice del ultimo undoObj
-      const lastUndoObjIndex = layersUndoStacks[lastUndoObj.layerStackName].findIndex(elem => elem.undoObjId === lastUndoObj.undoObjId)
+      const lastUndoObjIndex = layersUndoStacks[previousUndo.layerStackName].findIndex(elem => elem.undoObjId === previousUndo.undoObjId)
 
       // Usar el índice del último undoObj para encontrar el undoObj anterior a ese
-      const previousObj = layersUndoStacks[lastUndoObj.layerStackName][lastUndoObjIndex - 1]
+      const previousObj = layersUndoStacks[previousUndo.layerStackName][lastUndoObjIndex - 1]
       console.log(previousObj)
       if (!previousObj) return
 
@@ -306,28 +308,6 @@ export const DataProvider = ({ children }: DataProviderProps) => {
     })
   }
 
-  // const handleNewEmptyFrame = () => {
-  //   setLayers(prev => {
-  //     let newLayers = [...prev]
-
-  //     newLayers = newLayers.map(currentLayer => {
-  //       const newLayer = {...currentLayer}
-  //       if (newLayer.layerName === selectedLayer) {
-  //         let newKeyframesList: Keyframe[] = []
-
-  //         for (let i = 0; i < currentFrame; i++) {
-  //           if(!newLayer.keyframes[i]) {
-  //             newKeyframesList = [...newKeyframesList, defaultKeyframe(selectedLayer)]
-  //           }
-  //         }
-
-  //         newLayer.keyframes = [...newLayer.keyframes, newKeyframesList].flat()
-  //       }
-  //       return newLayer
-  //     })
-  //     return newLayers
-  //   })
-  // }
 
 
 
@@ -379,13 +359,10 @@ export const DataProvider = ({ children }: DataProviderProps) => {
 
 
 
-  useEffect(() => {
-    console.log(layers)
-  }, [currentFrame])
 
   useEffect(() => {
-    getKeyframesLength()
-  }, [layers])
+    console.log({mainUndoStack, redoStack, layersUndoStacks})
+  }, [mainUndoStack, redoStack, layersUndoStacks])
 
 
   const value: DataContextValue = {

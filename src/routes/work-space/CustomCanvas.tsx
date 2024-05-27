@@ -47,6 +47,12 @@ export const CustomCanvas = ({ layerName }: CanvasProps) => {
     return { x, y };
   };
 
+  const isDrawable = () => {
+    // Verificar que sea una capa en la que se pueda dibujar
+    const layer = layers.find(elem => elem.layerName === layerName)
+    if (!layer?.keyframes[currentFrame]) return false
+  }
+
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const { x, y } = getCanvasCoordinates(e);
 
@@ -56,6 +62,8 @@ export const CustomCanvas = ({ layerName }: CanvasProps) => {
     const ctx = canvas?.getContext("2d");
     if (!ctx) return
 
+    // Verificar que sea una capa en la que se pueda dibujar
+    if (isDrawable() === false) return
 
     setIsDrawing(true);
     ctx.strokeStyle = "black"
@@ -106,7 +114,7 @@ export const CustomCanvas = ({ layerName }: CanvasProps) => {
     // Buscar y actualizar el keyframe
     const keyframeId = layers[layerIndex].keyframes[currentFrame].id
     updateKeyframe(layerName, canvasDataURL, keyframeId)
-    
+
     // Agregar accion a undoStack
 
     const newLayerData = {
@@ -156,6 +164,7 @@ export const CustomCanvas = ({ layerName }: CanvasProps) => {
     const newUndoObject: undoStackObject = createUndoObj("layerAction", newLayerData, canvasDataURL, layerName, nanoid())
 
     // Agregar el objeto a la linea principal de acciones mainUndoStack
+    console.log(2)
     setMainUndoStack((prev: any) => {
       return [...prev, newUndoObject]
     })
@@ -181,17 +190,17 @@ export const CustomCanvas = ({ layerName }: CanvasProps) => {
     <canvas
       ref={canvasRef}
       className="ws-cs-canvas"
-      onMouseDown={handleMouseDown}
       onPointerDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
       onPointerMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
       onPointerUp={handleMouseUp}
-      onMouseLeave={handleMouseLeave}
       onPointerLeave={handleMouseLeave}
       width={400}
       height={400}
-      style={{ zIndex: zIndex, pointerEvents: selectedLayer === layerName ? "auto" : "none" }}
+      style={{
+        zIndex: zIndex,
+        pointerEvents: selectedLayer === layerName ? "auto" : "none",
+        cursor: isDrawable() === false ? "not-allowed" : "auto"
+      }}
     />
   );
 };

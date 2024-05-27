@@ -30,6 +30,9 @@ export const WorkSpaceRoute = () => {
     mainColor,
     setLayersUndoStacks,
     setMainUndoStack,
+    mainUndoStack,
+    layersUndoStacks,
+    redoStack,
     handleUndo,
     handleRedo,
     layers,
@@ -50,13 +53,46 @@ export const WorkSpaceRoute = () => {
 
 
 
+  const drawUndos = () => {
+    return (
+      <div style={{height: "100%"}}>
+        <div style={{ overflow: "hidden", overflowY: "scroll", height: "50%" }}>
+          <h1 style={{position: "sticky", top: "0"}}>Main Undo Stack</h1>
+          {
+            mainUndoStack.reverse().map(elem => (
+              <div>
+                <p>id: {elem.undoObjId}</p>
+                <p>type: {elem.undoType}</p>
+                <img src={elem.canvasDataURL} width={100} height={100} />
+              </div>
+            ))
+          }
+        </div>
+        <div style={{ overflow: "hidden", overflowY: "scroll", height: "50%" }}>
+          <h1 style={{position: "sticky", top: "0"}}>Main Redo Stack</h1>
+          {
+            redoStack.reverse().map(elem => (
+              <div>
+                <p>id: {elem.undoObjId}</p>
+                <p>type: {elem.undoType}</p>
+                <img src={elem.canvasDataURL} width={100} height={100} />
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    )
+  }
+
+
+
   // Generador de índices para el navegador del timeline
   const frameIndexGenerator = Array.from({ length: keyframesLength }, (_, index) => (
-      <div
-        className={`ws-tls-nav-frame ${index === currentFrame ? "current-frame" : ""}`}
-        onClick={() => setCurrentFrame(index)}
-        key={index}
-      />
+    <div
+      className={`ws-tls-nav-frame ${index === currentFrame ? "current-frame" : ""}`}
+      onClick={() => setCurrentFrame(index)}
+      key={index}
+    />
   ));
 
   const handleKeyframeClick = (index: number, layerName: string) => {
@@ -105,8 +141,8 @@ export const WorkSpaceRoute = () => {
         <header className="ws-fs-header">
           <p>File</p>
         </header>
-        <div className="ws-fs-body">
-
+        <div className="ws-fs-body" style={{ height: "500px" }}>
+          {drawUndos()}
         </div>
       </div>
       <div className="ws-canvas-section panel">
