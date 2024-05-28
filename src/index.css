@@ -48,3 +48,10 @@
   box-shadow: var(--box-shadow);
   border: var(--border);
 }
+
+.input1 {
+  border: none;
+  border-bottom-style: dashed;
+  background-color: rgba(0, 0, 0, 0);
+  outline: none;
+}

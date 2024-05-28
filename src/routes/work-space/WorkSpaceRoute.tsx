@@ -4,12 +4,12 @@ import "../../stylesheets/routes/work-space/WorkSpaceRoute.css"
 import { FaPaintBrush, FaEraser } from "react-icons/fa";
 import { IoArrowUndo, IoArrowRedo } from "react-icons/io5";
 import { BiLayerPlus } from "react-icons/bi";
+import { HiEye, HiEyeOff } from "react-icons/hi";
 
 
 import { CustomCanvas } from "./CustomCanvas";
 import { useContext } from "react";
 import { DataContext, createLayer, createUndoObj, undoStackObject } from "../../contexts/DataContext";
-import { nanoid } from "nanoid";
 import { ToolsSectionBody } from "./ToolsSectionBody";
 import { TbDeviceIpadHorizontalPlus, TbDeviceTabletPlus } from "react-icons/tb";
 
@@ -28,9 +28,8 @@ export const WorkSpaceRoute = () => {
     brushSize,
     setTool,
     mainColor,
-    setLayersUndoStacks,
-    setMainUndoStack,
     mainUndoStack,
+    setMainUndoStack,
     handleUndo,
     handleRedo,
     layers,
@@ -68,37 +67,96 @@ export const WorkSpaceRoute = () => {
 
 
   const handleNewLayer = () => {
-    const newLayerName = `Layer_` + (layers.length).toString()
-    const newLayer = createLayer(newLayerName, layers.length - 1)
-    setLayers(prev => [...prev, newLayer])
-
-
-    const newLayerData = {
-      layerName: newLayerName,
-      layerSettings: newLayer.layerSettings,
-      keyframes: newLayer.keyframes
-    }
+    // Crear un undoObj
     const newUndoObject: undoStackObject =
-      createUndoObj("newLayer", newLayerData, undefined, newLayerName, nanoid(), undefined, undefined)
-
+      createUndoObj(selectedLayer, currentFrame, layers, "newLayer")
 
     // Agregar el objeto a la linea principal de acciones (mainUndoStack)
     setMainUndoStack((prev: undoStackObject[]) => {
       return [...prev, newUndoObject]
     })
 
-    // Agregar el objeto a la linea secundaria de acciones (layersUndoStacks)
-    setLayersUndoStacks(prevState => ({
-      ...prevState,
-      [newLayerName]: prevState[newLayerName] ? [...prevState[newLayerName], newUndoObject] : [newUndoObject]
-    }));
+    // Crear la nueva capa y agregarla a layers[]
+    const newLayerName = `Layer_` + (layers.length).toString()
+    const newLayer = createLayer(newLayerName, layers.length - 1)
+    setLayers(prev => [...prev, newLayer])
 
-
+    // Seleccionar la nueva capa
     setSelectedLayer(newLayerName)
+  }
+
+  const handleLayerVisibility = (layerName: string) => {
+    setLayers(prev => {
+      let newLayers = [...prev]
+
+      newLayers = newLayers.map(currentLayer => {
+        if (currentLayer.layerName === layerName) {
+          currentLayer.layerSettings.hidden = !currentLayer.layerSettings.hidden
+        }
+        return currentLayer
+      })
+      return newLayers
+    })
+  }
+  const handleLayerOpacity = (e: React.ChangeEvent<HTMLInputElement>, layerName: string) => {
+    e.preventDefault()
+
+    setLayers(prev => {
+      let newLayers = [...prev]
+
+      newLayers = newLayers.map(elem => {
+        if(elem.layerName === layerName) elem.layerSettings.opacity = Number(e.target.value)
+        return elem
+      })
+      return newLayers
+    })
   }
 
 
 
+
+  const undoStackDisplay = () => {
+    return (
+      <div style={{ marginLeft: 10, overflow: "hidden", overflowY: "scroll", height: "100%" }}>
+        <h3>Undo Stack Display</h3>
+        {
+          mainUndoStack.map((elem, index) =>
+            elem.undoType ?
+              <div key={index} style={{ marginBottom: 15 }}>
+                <p>ID: {elem.undoId}</p>
+                <p>Type: {elem.undoType}</p>
+                <div>
+                  {
+                    elem.layers.map((currentLayer, index) => (
+                      <div key={index}>
+                        <p>{currentLayer.layerName}</p>
+                        <div>
+                          {
+                            currentLayer.keyframes.map((currentKeyframe, index) => (
+                              <img
+                                style={{
+                                  width: 50,
+                                  height: 50,
+                                  border: "solid black 1px",
+                                  marginRight: 5
+                                }}
+                                key={index}
+                                src={currentKeyframe.dataURL}
+                              />
+                            ))
+                          }
+                        </div>
+                      </div>
+                    ))
+                  }
+                </div>
+              </div>
+              : undefined
+          )
+        }
+      </div>
+    )
+  }
 
 
   return (
@@ -108,13 +166,17 @@ export const WorkSpaceRoute = () => {
           <p>File</p>
         </header>
         <div className="ws-fs-body" style={{ height: "500px" }}>
-          {currentFrame}
+          {
+            undoStackDisplay()
+          }
         </div>
       </div>
       <div className="ws-canvas-section panel">
         {
           layers.map((currentLayer, index) => (
-            <CustomCanvas key={index} layerName={currentLayer.layerName} />
+            !currentLayer.layerSettings.hidden ?
+              <CustomCanvas key={index} layerData={currentLayer} />
+              : undefined
           ))
         }
         <canvas width={400} height={400} className="ws-cs-base" />
@@ -161,6 +223,22 @@ export const WorkSpaceRoute = () => {
                 onClick={() => setSelectedLayer(elem.layerName)}
               >
                 <p>{elem.layerName}</p>
+                <div className="layer-options">
+                  <input
+                    className="input1 layer-opacity-input"
+                    type="number"
+                    step={0.01}
+                    value={elem.layerSettings.opacity}
+                    onChange={e => handleLayerOpacity(e, elem.layerName)}
+                    min={0}
+                    max={1}
+                  />
+                  {
+                    elem.layerSettings.hidden ?
+                      <HiEyeOff onClick={() => handleLayerVisibility(elem.layerName)} />
+                      : <HiEye onClick={() => handleLayerVisibility(elem.layerName)} />
+                  }
+                </div>
               </div>
             ))
           }

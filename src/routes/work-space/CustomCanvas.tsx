@@ -1,12 +1,11 @@
 import { useContext, useState, useEffect, useRef } from "react";
 import { DataContext, createUndoObj, undoStackObject } from "../../contexts/DataContext";
-import { nanoid } from "nanoid";
-
+import {Layer} from "../../contexts/DataContext"
 type CanvasProps = {
-  layerName: string
+  layerData: Layer
 }
 
-export const CustomCanvas = ({ layerName }: CanvasProps) => {
+export const CustomCanvas = ({ layerData }: CanvasProps) => {
   const [isDrawing, setIsDrawing] = useState(false);
   const [zIndex, setZIndex] = useState<number>(0)
   const contextValues = useContext(DataContext)
@@ -21,9 +20,8 @@ export const CustomCanvas = ({ layerName }: CanvasProps) => {
     selectedLayer,
     registerCanvasRef,
     setMainUndoStack,
+    mainUndoStack,
     layers,
-    setLayersUndoStacks,
-    layersUndoStacks,
     updateKeyframe,
     currentFrame
   } = contextValues
@@ -31,9 +29,9 @@ export const CustomCanvas = ({ layerName }: CanvasProps) => {
 
   useEffect(() => {
     if (registerCanvasRef) {
-      registerCanvasRef(layerName, canvasRef);
+      registerCanvasRef(layerData.layerName, canvasRef);
     }
-  }, [registerCanvasRef, layerName]);
+  }, [registerCanvasRef, layerData.layerName]);
 
 
   const getCanvasCoordinates = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -49,14 +47,14 @@ export const CustomCanvas = ({ layerName }: CanvasProps) => {
 
   const isDrawable = () => {
     // Verificar que sea una capa en la que se pueda dibujar
-    const layer = layers.find(elem => elem.layerName === layerName)
+    const layer = layers.find(elem => elem.layerName === layerData.layerName)
     if (!layer?.keyframes[currentFrame]) return false
   }
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const { x, y } = getCanvasCoordinates(e);
 
-    const layerIndex = layers.findIndex(elem => elem.layerName === layerName)
+    const layerIndex = layers.findIndex(elem => elem.layerName === layerData.layerName)
     const canvas = canvasRefs[layerIndex].ref.current;
     if (!canvas) return
     const ctx = canvas?.getContext("2d");
@@ -81,7 +79,7 @@ export const CustomCanvas = ({ layerName }: CanvasProps) => {
 
     const { x, y } = getCanvasCoordinates(e);
 
-    const layerIndex = layers.findIndex(elem => elem.layerName === layerName)
+    const layerIndex = layers.findIndex(elem => elem.layerName === layerData.layerName)
     const canvas = canvasRefs[layerIndex].ref.current;
     const ctx = canvas?.getContext("2d");
 
@@ -97,15 +95,19 @@ export const CustomCanvas = ({ layerName }: CanvasProps) => {
   };
 
   const handleMouseUp = () => {
+    // Establecer isDrawing en false
     setIsDrawing(false);
 
-    const layerIndex = layers.findIndex(elem => elem.layerName === layerName)
+    // Buscar el índice de la capa actual para luego encontrar el canvas correspondiente
+    const layerIndex = layers.findIndex(elem => elem.layerName === layerData.layerName)
     const canvas = canvasRefs[layerIndex].ref.current;
 
+    // Verificar que el canvas está definido y obtener el contexto
     if (!canvas) return
     const ctx = canvas.getContext("2d")
     if (!ctx) return
 
+    // Establecer la composición global en "source-over" para evitar que borre el trazo en vez de dibujarlo
     ctx.globalCompositeOperation = "source-over"
 
     // Generar el dataURL
@@ -113,77 +115,57 @@ export const CustomCanvas = ({ layerName }: CanvasProps) => {
 
     // Buscar y actualizar el keyframe
     const keyframeId = layers[layerIndex].keyframes[currentFrame].id
-    updateKeyframe(layerName, canvasDataURL, keyframeId)
+    updateKeyframe(layerData.layerName, canvasDataURL, keyframeId)
 
-    // Agregar accion a undoStack
-
-    const newLayerData = {
-      layerName: layerName,
-      layerSettings: layers[layerIndex].layerSettings,
-      keyframes: layers[layerIndex].keyframes
-    }
+    // Crear un undoObj
     const newUndoObject: undoStackObject =
-      createUndoObj("layerAction", newLayerData, canvasDataURL, layerName, nanoid(), currentFrame, keyframeId)
+      createUndoObj(layerData.layerName, currentFrame, layers, "layerEvent")
 
     // Agregar el objeto a la linea principal de acciones mainUndoStack
     setMainUndoStack((prev: any) => {
       return [...prev, newUndoObject]
     })
-
-    // Agregar el objeto a la linea secundaria de acciones layersUndoStacks
-    setLayersUndoStacks(prevState => ({
-      ...prevState,
-      [layerName]: prevState[layerName] ? [...prevState[layerName], newUndoObject] : [newUndoObject]
-    }));
   };
 
   const handleMouseLeave = () => {
     setIsDrawing(false);
 
-    const layerIndex = layers.findIndex(elem => elem.layerName === layerName)
+    const layerIndex = layers.findIndex(elem => elem.layerName === layerData.layerName)
     const canvas = canvasRefs[layerIndex].ref.current;
 
-    if (!canvas) return
+    if (!canvas) return 
 
     // Buscar el valor anterior del canvas en layersStacks
-    const layersStack = layersUndoStacks[layerName]
-    const previousObj = layersStack[layersStack.length - 1]
-    if (!previousObj || !previousObj.canvasDataURL || canvas.toDataURL() === previousObj.canvasDataURL) return
+    const previousLayer = mainUndoStack[mainUndoStack.length - 1].layers.find(elem => {
+      if (elem.layerName === layerData.layerName) return elem
+    })
+    if (
+      !previousLayer ||
+      !previousLayer.keyframes[currentFrame].dataURL ||
+      canvas.toDataURL() === previousLayer.keyframes[currentFrame].dataURL
+    ) return
 
     const ctx = canvas.getContext("2d")
     if (!ctx) return
 
     ctx.globalCompositeOperation = "source-over"
 
-    // Agregar accion a undoStack
-    const canvasDataURL = canvas.toDataURL()
-    const newLayerData = {
-      layerName: layerName,
-      layerSettings: layers[layerIndex].layerSettings,
-      keyframes: layers[layerIndex].keyframes
-    }
 
-    const keyframeId = layers[layerIndex].keyframes[currentFrame].id
+    // Crear un undoObj
     const newUndoObject: undoStackObject =
-      createUndoObj("layerAction", newLayerData, canvasDataURL, layerName, nanoid(), currentFrame, keyframeId)
+      createUndoObj(selectedLayer, currentFrame, layers)
 
     // Agregar el objeto a la linea principal de acciones mainUndoStack
     setMainUndoStack((prev: any) => {
       return [...prev, newUndoObject]
     })
-
-    // Agregar el objeto a la linea secundaria de acciones layersUndoStacks
-    setLayersUndoStacks(prevState => ({
-      ...prevState,
-      [layerName]: prevState[layerName] ? [...prevState[layerName], newUndoObject] : [newUndoObject]
-    }));
   };
 
 
 
   // Get Z-index
   useEffect(() => {
-    const index = layers.findIndex(elem => elem.layerName === layerName)
+    const index = layers.findIndex(elem => elem.layerName === layerData.layerName)
     setZIndex(index + 20)
   }, [layers])
 
@@ -201,8 +183,9 @@ export const CustomCanvas = ({ layerName }: CanvasProps) => {
       height={400}
       style={{
         zIndex: zIndex,
-        pointerEvents: selectedLayer === layerName ? "auto" : "none",
-        cursor: isDrawable() === false ? "not-allowed" : "auto"
+        pointerEvents: selectedLayer === layerData.layerName ? "auto" : "none",
+        cursor: isDrawable() === false ? "not-allowed" : "auto",
+        opacity: layerData.layerSettings.opacity
       }}
     />
   );

@@ -13,15 +13,16 @@ interface Keyframe {
   id: string
 }
 
-interface Layer {
+export interface Layer {
   layerName: string
-  layerSettings: { opacity: number, lock: boolean, layerLevel: number }
+  layerSettings: { opacity: number, hidden: boolean, lock: boolean, layerLevel: number }
   keyframes: Keyframe[]
 }
 
 const defaultLayerSettings = {
   opacity: 1,
   lock: false,
+  hidden: false
 };
 
 const defaultKeyframe = (parentLayerName: string): Keyframe => ({
@@ -54,37 +55,31 @@ interface CanvasRef {
 }
 
 export interface undoStackObject {
-  undoType: "layerAction" | "newLayer" | "newKeyframe"
-  layerData: Layer
-  canvasDataURL: string | undefined
-  layerStackName: string
-  undoObjId: string,
-  frameIndex: number | undefined,
-  keyframeId: string | undefined,
-  newKeyframes?: Keyframe[]
+  undoType?: "layerEvent" | "newLayer" | "newKeyframe",
+  selectedLayer: string,
+  currentFrameIndex: number,
+  layers: Layer[],
+  undoId: string
 }
 
 export const createUndoObj = (
-  undoType: "layerAction" | "newLayer" | "newKeyframe",
-  layerData: Layer, // undoType => all
-  canvasDataURL: string | undefined, // undoType => layerAction
-  layerStackName: string, // undoType => all
-  undoObjId: string, // undoType => all
-  frameIndex: number | undefined, // undoType => layerAction
-  keyframeId: string | undefined, // undoType => layerAction
-  newKeyframes?: Keyframe[] // undoType => newKeyframe
+  selectedLayer: string,
+  currentFrameIndex: number,
+  layers: Layer[],
+  undoType?: "layerEvent" | "newLayer" | "newKeyframe"
 ): undoStackObject => {
   return {
-    undoType,
-    layerData,
-    canvasDataURL,
-    layerStackName,
-    undoObjId,
-    frameIndex,
-    keyframeId,
-    newKeyframes
+    selectedLayer,
+    currentFrameIndex,
+    layers: layers.map(layer => ({
+      ...layer,
+      keyframes: layer.keyframes.map(keyframe => ({ ...keyframe }))
+    })),
+    undoId: nanoid(),
+    undoType
   };
 };
+
 
 
 interface DataContextValue {
@@ -102,8 +97,6 @@ interface DataContextValue {
   setRedoStack: Dispatch<SetStateAction<undoStackObject[]>>
   handleUndo: () => void
   handleRedo: () => void
-  layersUndoStacks: { [layerStackName: string]: undoStackObject[] }
-  setLayersUndoStacks: Dispatch<SetStateAction<{ [layerStackName: string]: undoStackObject[] }>>
   layers: Layer[]
   setLayers: Dispatch<SetStateAction<Layer[]>>
   selectedLayer: string
@@ -140,19 +133,17 @@ export const DataProvider = ({ children }: DataProviderProps) => {
   const [brushSize, setBrushSize] = useState(12)
 
   const defaultUndoObj: undoStackObject = {
-    undoType: "layerAction",
-    layerData: { keyframes: [defaultKeyframe("Layer_0")], layerName: "Layer_0", layerSettings: { layerLevel: 0, lock: false, opacity: 1 } },
-    canvasDataURL: undefined,
-    layerStackName: "Layer_0",
-    undoObjId: nanoid(),
-    keyframeId: undefined,
-    frameIndex: 0
+    layers: [{
+      keyframes: [defaultKeyframe("Layer_0")],
+      layerName: "Layer_0",
+      layerSettings: { layerLevel: 0, lock: false, opacity: 1, hidden: false }
+    }],
+    undoId: nanoid(),
+    currentFrameIndex: 0,
+    selectedLayer: "Layer_0"
   }
   const [mainUndoStack, setMainUndoStack] = useState<undoStackObject[]>([defaultUndoObj]);
   const [redoStack, setRedoStack] = useState<undoStackObject[]>([]);
-
-  const initialLayersUndoStacks = { Layer_0: [defaultUndoObj] }
-  const [layersUndoStacks, setLayersUndoStacks] = useState<{ [layerStackName: string]: undoStackObject[] }>(initialLayersUndoStacks)
 
   // Crear un layer inicial genérico
   const initialLayer = createLayer("Layer_0", 0);
@@ -177,223 +168,108 @@ export const DataProvider = ({ children }: DataProviderProps) => {
 
 
   const handleUndo = () => {
-    const previousUndo = mainUndoStack[mainUndoStack.length - 2];
-    console.log("previousUndo:")
-    console.log(previousUndo)
+    const previousUndoObj = mainUndoStack[mainUndoStack.length - 2]
+    const lastUndoObj = mainUndoStack[mainUndoStack.length - 1]
 
-    if (previousUndo.undoType === "newLayer") {
-      handleDeleteLayer(previousUndo.layerData.layerName)
+    // Actualizar el estado global de la aplicacion: layers, selectedFrame, currentFrameIndex
+    setLayers(previousUndoObj.layers)
+    setSelectedLayer(previousUndoObj.selectedLayer)
+    setCurrentFrame(previousUndoObj.currentFrameIndex)
 
-      setRedoStack([...redoStack, previousUndo]);
-
-      // Actualizar el stack de undo
-      const newUndoStack = mainUndoStack.slice(0, -1);
-      setMainUndoStack(newUndoStack);
-    } else if (previousUndo.undoType === "layerAction" && previousUndo.canvasDataURL) {
-      // Ir a la capa del undo anterior
-      setSelectedLayer(previousUndo.layerData.layerName)
-
-      // Ir al frameIndex del undo anterior
-      console.log("frameIndex: " + previousUndo.frameIndex)
-      if(previousUndo.frameIndex !== undefined) setCurrentFrame(previousUndo.frameIndex)
-      
-      // Obtener el indice del canvas en canvasRefs
-      const layerName = previousUndo.layerData.layerName
-      const layerIndex = canvasRefs.current.findIndex(elem => elem.layerName === layerName)
-
-      // Obtener el canvas en el índice especificado
-      const canvas = canvasRefs.current[layerIndex];
-
-      // Verificar que el canvas existe y que hay más de una imagen en undoStack
-      if (!canvas || !canvas.ref.current || mainUndoStack.length <= 1) return;
-
-      // Obtener el contexto del canvas
-      const ctx = canvas.ref.current.getContext('2d');
-      if (!ctx) return;
-
-      // Actualizar redoStack
-      setRedoStack([...redoStack, mainUndoStack[mainUndoStack.length - 1]]);
-
-      // Actualizar el mainUndoStack
-      const newUndoStack = [...mainUndoStack].filter(elem => elem.undoObjId !== previousUndo.undoObjId);
-      setMainUndoStack(newUndoStack);
-
-      // Limpiar el canvas
-      ctx.clearRect(0, 0, canvas.ref.current.width, canvas.ref.current.height);
-
-      // Dibujar el undoObj anterior
-      if (!previousUndo.canvasDataURL) return
-      const img = new Image();
-      img.src = previousUndo.canvasDataURL;
-      img.onload = () => {
-        ctx.drawImage(img, 0, 0);
-      };
-    } else if(previousUndo.undoType === "newKeyframe") {
-      console.log(mainUndoStack)
-      // Ir a la capa del undo anterior
-      setSelectedLayer(previousUndo.layerData.layerName)
-
-      // Ir al frameIndex del undo anterior
-      console.log("frameIndex: " + previousUndo.frameIndex)
-      if(previousUndo.frameIndex !== undefined) setCurrentFrame(previousUndo.frameIndex)
-      
-    }
+    // Eliminar el último valor de mainUndoStack y agregarlo a redoStack
+    setMainUndoStack(prev => {
+      const newUndoStack = [...prev].filter(elem => elem.undoId !== lastUndoObj.undoId)
+      return newUndoStack
+    })
+    setRedoStack(prev => [...prev, lastUndoObj])
   }
 
-
-
   const handleRedo = () => {
-    //Obtener el último redo
-    const lastRedo = redoStack[redoStack.length - 1];
+    const lastRedoObj = redoStack[redoStack.length - 1]
 
-    //Obtener layer actual
-    const layerName = lastRedo.layerData.layerName
-    const layerIndex = canvasRefs.current.findIndex(elem => elem.layerName === layerName)
+    // Actualizar el estado global de la aplicacion: layers, selectedFrame, currentFrameIndex
+    setLayers(lastRedoObj.layers)
+    setSelectedLayer(lastRedoObj.selectedLayer)
+    setCurrentFrame(lastRedoObj.currentFrameIndex)
 
-    //Eliminarlo y agregarlo a undoStack
-    setRedoStack(redoStack.slice(0, -1));
-    setMainUndoStack([...mainUndoStack, lastRedo]);
-
-    if (lastRedo && lastRedo.undoType === "newLayer") {
-      setLayers(prev => {
-        const position = lastRedo.layerData.layerSettings.layerLevel + 1
-        const layer = lastRedo.layerData
-
-        // Crear un nuevo array con el nuevo elemento insertado en la posición deseada
-        const newLayers = [
-          ...prev.slice(0, position),
-          layer,
-          ...prev.slice(position)
-        ];
-        return newLayers;
-      })
-    } else if (lastRedo.undoType === "layerAction") {
-      const canvas = canvasRefs.current[layerIndex];
-      if (!canvas || !canvas.ref.current || redoStack.length === 0) return;
-
-      const ctx = canvas.ref.current.getContext('2d');
-      if (!ctx) return;
-
-      if (!lastRedo.canvasDataURL) return // esto en el caso de que undoType sea "layerAction"
-
-      // Limpiar el canvas
-      ctx.clearRect(0, 0, canvas.ref.current.width, canvas.ref.current.height);
-
-
-      // Dibujar el último valor de redoStack
-      const img = new Image();
-      img.src = lastRedo.canvasDataURL;
-      img.onload = () => {
-        ctx.drawImage(img, 0, 0);
-      };
-    }
+    // Actualizar mainUndoStack y redoStack
+    setMainUndoStack(prev => [...prev, lastRedoObj])
+    setRedoStack(prev => {
+      const newRedoStack = [...prev].filter(elem => elem.undoId !== lastRedoObj.undoId)
+      return newRedoStack
+    })
+    
   };
 
 
-  const handleDeleteLayer = (layerName: string) => {
-    setLayers(prev => {
-      return prev.filter(elem => elem.layerName !== layerName)
-    })
-  }
-
-
-
-
   const handleNewEmptyFrame = () => {
-    setLayers(prev => {
-      let newLayers = [...prev]
+    let newLayers = [...layers]
+    let keyframesLength = 0
 
-      newLayers = newLayers.map(currentLayer => {
-        if (currentLayer.layerName === selectedLayer) {
-          if (currentFrame > currentLayer.keyframes.length - 1) {
-            
-            // Generar una lista de los nuevos keyframes y agregarlos a la capa
-            let newKeyframesList: Keyframe[] = []
+    newLayers = newLayers.map(currentLayer => {
+      let newCurrentLayer = { ...currentLayer }
+      if (newCurrentLayer.layerName === selectedLayer) {
 
-            for (let i = 0; i < currentFrame + 1; i++) {
-              if (!currentLayer.keyframes[i]) {
-                newKeyframesList = [...newKeyframesList, defaultKeyframe(selectedLayer)]
-              }
+        if (currentFrame > newCurrentLayer.keyframes.length - 1) {
+
+          // Generar una lista de los nuevos keyframes y agregarlos a la capa
+          let newKeyframesList: Keyframe[] = []
+
+          for (let i = 0; i < currentFrame + 1; i++) {
+            if (!newCurrentLayer.keyframes[i]) {
+              newKeyframesList = [...newKeyframesList, defaultKeyframe(selectedLayer)]
             }
-            currentLayer.keyframes = [...currentLayer.keyframes, newKeyframesList].flat()
-            
-            // Crear un nuevo undoObj
-            const newUndoObject = createUndoObj(
-              "newKeyframe",
-              currentLayer,
-              undefined,
-              selectedLayer,
-              nanoid(),
-              currentFrame,
-              undefined,
-              newKeyframesList
-            )
-
-            // Enviar el nuevo undoObj a mainUndoStack
-            setMainUndoStack(prev => [...prev, newUndoObject])
-
-            // Enviar el nuevo undoObj a layersUndoStack
-            setLayersUndoStacks(prevState => ({
-              ...prevState,
-              [selectedLayer]: prevState[selectedLayer] ? [...prevState[selectedLayer], newUndoObject] : [newUndoObject]
-            }));
-
-          } else {
-            const newKeyframe = defaultKeyframe(selectedLayer)
-            currentLayer.keyframes = [...currentLayer.keyframes, newKeyframe]
-            setCurrentFrame(currentLayer.keyframes.length - 1)
-
-            // Crear un nuevo undoObj
-            const newUndoObject = createUndoObj(
-              "newKeyframe",
-              currentLayer,
-              undefined,
-              selectedLayer,
-              nanoid(),
-              currentFrame,
-              undefined,
-              [newKeyframe]
-            )
-            
-            // Enviar el nuevo undoObj a mainUndoStack
-            setMainUndoStack(prev => [...prev, newUndoObject])
-
-            // Enviar el nuevo undoObj a layersUndoStack
-            setLayersUndoStacks(prevState => ({
-              ...prevState,
-              [selectedLayer]: prevState[selectedLayer] ? [...prevState[selectedLayer], newUndoObject] : [newUndoObject]
-            }));
           }
+          newCurrentLayer.keyframes = [...newCurrentLayer.keyframes, newKeyframesList].flat()
+        } else {
+          const newKeyframe = defaultKeyframe(selectedLayer)
+          newCurrentLayer.keyframes = [...newCurrentLayer.keyframes, newKeyframe]
+          setCurrentFrame(newCurrentLayer.keyframes.length - 1)
+          keyframesLength = newCurrentLayer.keyframes.length - 1
         }
-        return currentLayer
-      })
-      return newLayers
+      }
+      return newCurrentLayer
     })
+
+    setLayers(newLayers)
+
+    // Crear un nuevo undoObj
+    const newUndoObject = createUndoObj(
+      selectedLayer,
+      keyframesLength,
+      newLayers,
+      "newKeyframe"
+    )
+
+    // Enviar el nuevo undoObj a mainUndoStack
+    setMainUndoStack(prev => [...prev, newUndoObject])
   }
 
 
 
 
-  const updateKeyframe = (layerName: string, dataURL: string, keyframeId: string) => {
-    setLayers(prev => {
-      let newLayers = [...prev]
-      newLayers = newLayers.map(currentLayer => {
-        if (currentLayer.layerName === layerName) {
-          currentLayer.keyframes = currentLayer.keyframes.map(currentKeyframe => {
-            if (currentKeyframe.id === keyframeId) {
-              currentKeyframe.dataURL = dataURL
-            }
-            return currentKeyframe
-          })
-        }
-        return currentLayer
-      })
-      return newLayers
+  // Actualizar un keyframe luego de dibujar en el (esta función se llama desde el canvas luego de modificarlo)
+  const updateKeyframe = (layerName: string, dataURL: string, keyframeId: string) => {    
+    let newLayers = [...layers]
+
+    newLayers = newLayers.map(currentLayer => {
+      let currentNewLayer = { ...currentLayer }
+      if (currentNewLayer.layerName === layerName) {
+        currentNewLayer.keyframes = currentNewLayer.keyframes.map(currentKeyframe => {
+          if (currentKeyframe.id === keyframeId) {
+            currentKeyframe.dataURL = dataURL
+          }
+          return currentKeyframe
+        })
+      }
+      return currentNewLayer
     })
+
+    setLayers(newLayers)
   }
 
 
-  // Dibujar las capas actuales luego de cambiar de frame
+  // Dibujar las capas actuales luego de cambiar de frame o hacer CTRL + Z
   useEffect(() => {
     canvasRefs.current.map((currentRef) => {
       const canvasRef = currentRef.ref.current
@@ -418,17 +294,12 @@ export const DataProvider = ({ children }: DataProviderProps) => {
         ctx.drawImage(img, 0, 0);
       };
     })
-  }, [currentFrame])
+  }, [currentFrame, layers])
 
 
   useEffect(() => {
     getKeyframesLength()
   }, [layers])
-
-
-  useEffect(() => {
-    console.log({mainUndoStack, redoStack, layersUndoStacks})
-  }, [mainUndoStack, redoStack, layersUndoStacks])
 
 
   const value: DataContextValue = {
@@ -446,8 +317,6 @@ export const DataProvider = ({ children }: DataProviderProps) => {
     setRedoStack,
     handleUndo,
     handleRedo,
-    layersUndoStacks,
-    setLayersUndoStacks,
     layers,
     setLayers,
     selectedLayer,

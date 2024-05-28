@@ -170,6 +170,9 @@
 .ws-ls-body {
     display: flex;
     flex-direction: column;
+    height: 80%;
+    overflow: hidden;
+    overflow-y: auto;
 }
 .ws-ls-body .selected-layer {
     background-color: var(--color-2-bold);
@@ -177,12 +180,31 @@
 .ws-ls-body .layer {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     height: 40px;
+    min-height: 40px;
     border-bottom: var(--border);
 }
 .ws-ls-body .layer p {
     margin-left: 10px;
 }
+.layer-options {
+    margin-right: 10px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    font-size: 22px;
+}
+.layer-opacity-input {
+    text-align: center;
+    width: 100px;
+    font-size: 18px;
+    margin-right: 10px;
+}
+.layer-options svg {
+    cursor: pointer;
+}
+
 
 /* TIME-LINE SECTION */
 .ws-timeline-section {
