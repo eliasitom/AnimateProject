@@ -31,8 +31,6 @@ export const WorkSpaceRoute = () => {
     setLayersUndoStacks,
     setMainUndoStack,
     mainUndoStack,
-    layersUndoStacks,
-    redoStack,
     handleUndo,
     handleRedo,
     layers,
@@ -50,39 +48,6 @@ export const WorkSpaceRoute = () => {
   }
 
 
-
-
-
-  const drawUndos = () => {
-    return (
-      <div style={{height: "100%"}}>
-        <div style={{ overflow: "hidden", overflowY: "scroll", height: "50%" }}>
-          <h1 style={{position: "sticky", top: "0"}}>Main Undo Stack</h1>
-          {
-            mainUndoStack.reverse().map(elem => (
-              <div>
-                <p>id: {elem.undoObjId}</p>
-                <p>type: {elem.undoType}</p>
-                <img src={elem.canvasDataURL} width={100} height={100} />
-              </div>
-            ))
-          }
-        </div>
-        <div style={{ overflow: "hidden", overflowY: "scroll", height: "50%" }}>
-          <h1 style={{position: "sticky", top: "0"}}>Main Redo Stack</h1>
-          {
-            redoStack.reverse().map(elem => (
-              <div>
-                <p>id: {elem.undoObjId}</p>
-                <p>type: {elem.undoType}</p>
-                <img src={elem.canvasDataURL} width={100} height={100} />
-              </div>
-            ))
-          }
-        </div>
-      </div>
-    )
-  }
 
 
 
@@ -113,7 +78,8 @@ export const WorkSpaceRoute = () => {
       layerSettings: newLayer.layerSettings,
       keyframes: newLayer.keyframes
     }
-    const newUndoObject: undoStackObject = createUndoObj("newLayer", newLayerData, undefined, newLayerName, nanoid())
+    const newUndoObject: undoStackObject =
+      createUndoObj("newLayer", newLayerData, undefined, newLayerName, nanoid(), undefined, undefined)
 
 
     // Agregar el objeto a la linea principal de acciones (mainUndoStack)
@@ -142,7 +108,7 @@ export const WorkSpaceRoute = () => {
           <p>File</p>
         </header>
         <div className="ws-fs-body" style={{ height: "500px" }}>
-          {drawUndos()}
+          {currentFrame}
         </div>
       </div>
       <div className="ws-canvas-section panel">

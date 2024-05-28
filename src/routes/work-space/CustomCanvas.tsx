@@ -122,7 +122,8 @@ export const CustomCanvas = ({ layerName }: CanvasProps) => {
       layerSettings: layers[layerIndex].layerSettings,
       keyframes: layers[layerIndex].keyframes
     }
-    const newUndoObject: undoStackObject = createUndoObj("layerAction", newLayerData, canvasDataURL, layerName, nanoid())
+    const newUndoObject: undoStackObject =
+      createUndoObj("layerAction", newLayerData, canvasDataURL, layerName, nanoid(), currentFrame, keyframeId)
 
     // Agregar el objeto a la linea principal de acciones mainUndoStack
     setMainUndoStack((prev: any) => {
@@ -161,10 +162,12 @@ export const CustomCanvas = ({ layerName }: CanvasProps) => {
       layerSettings: layers[layerIndex].layerSettings,
       keyframes: layers[layerIndex].keyframes
     }
-    const newUndoObject: undoStackObject = createUndoObj("layerAction", newLayerData, canvasDataURL, layerName, nanoid())
+
+    const keyframeId = layers[layerIndex].keyframes[currentFrame].id
+    const newUndoObject: undoStackObject =
+      createUndoObj("layerAction", newLayerData, canvasDataURL, layerName, nanoid(), currentFrame, keyframeId)
 
     // Agregar el objeto a la linea principal de acciones mainUndoStack
-    console.log(2)
     setMainUndoStack((prev: any) => {
       return [...prev, newUndoObject]
     })

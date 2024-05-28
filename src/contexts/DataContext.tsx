@@ -54,26 +54,35 @@ interface CanvasRef {
 }
 
 export interface undoStackObject {
-  undoType: "layerAction" | "newLayer"
+  undoType: "layerAction" | "newLayer" | "newKeyframe"
   layerData: Layer
   canvasDataURL: string | undefined
   layerStackName: string
-  undoObjId: string
+  undoObjId: string,
+  frameIndex: number | undefined,
+  keyframeId: string | undefined,
+  newKeyframes?: Keyframe[]
 }
 
 export const createUndoObj = (
-  undoType: "layerAction" | "newLayer",
-  layerData: Layer,
-  canvasDataURL: string | undefined,
-  layerStackName: string,
-  undoObjId: string
+  undoType: "layerAction" | "newLayer" | "newKeyframe",
+  layerData: Layer, // undoType => all
+  canvasDataURL: string | undefined, // undoType => layerAction
+  layerStackName: string, // undoType => all
+  undoObjId: string, // undoType => all
+  frameIndex: number | undefined, // undoType => layerAction
+  keyframeId: string | undefined, // undoType => layerAction
+  newKeyframes?: Keyframe[] // undoType => newKeyframe
 ): undoStackObject => {
   return {
     undoType,
     layerData,
     canvasDataURL,
     layerStackName,
-    undoObjId
+    undoObjId,
+    frameIndex,
+    keyframeId,
+    newKeyframes
   };
 };
 
@@ -135,7 +144,9 @@ export const DataProvider = ({ children }: DataProviderProps) => {
     layerData: { keyframes: [defaultKeyframe("Layer_0")], layerName: "Layer_0", layerSettings: { layerLevel: 0, lock: false, opacity: 1 } },
     canvasDataURL: undefined,
     layerStackName: "Layer_0",
-    undoObjId: nanoid()
+    undoObjId: nanoid(),
+    keyframeId: undefined,
+    frameIndex: 0
   }
   const [mainUndoStack, setMainUndoStack] = useState<undoStackObject[]>([defaultUndoObj]);
   const [redoStack, setRedoStack] = useState<undoStackObject[]>([]);
@@ -179,9 +190,14 @@ export const DataProvider = ({ children }: DataProviderProps) => {
       const newUndoStack = mainUndoStack.slice(0, -1);
       setMainUndoStack(newUndoStack);
     } else if (previousUndo.undoType === "layerAction" && previousUndo.canvasDataURL) {
-      console.log(1)
+      // Ir a la capa del undo anterior
+      setSelectedLayer(previousUndo.layerData.layerName)
+
+      // Ir al frameIndex del undo anterior
+      console.log("frameIndex: " + previousUndo.frameIndex)
+      if(previousUndo.frameIndex !== undefined) setCurrentFrame(previousUndo.frameIndex)
+      
       // Obtener el indice del canvas en canvasRefs
-      console.log(mainUndoStack[mainUndoStack.length - 1])
       const layerName = previousUndo.layerData.layerName
       const layerIndex = canvasRefs.current.findIndex(elem => elem.layerName === layerName)
 
@@ -195,30 +211,32 @@ export const DataProvider = ({ children }: DataProviderProps) => {
       const ctx = canvas.ref.current.getContext('2d');
       if (!ctx) return;
 
-      // Obtener el último objeto del stack
-      setRedoStack([...redoStack, previousUndo]);
+      // Actualizar redoStack
+      setRedoStack([...redoStack, mainUndoStack[mainUndoStack.length - 1]]);
 
-      // Actualizar el stack de undo
-      const newUndoStack = mainUndoStack.filter(elem => elem.undoObjId !== previousUndo.undoObjId);
+      // Actualizar el mainUndoStack
+      const newUndoStack = [...mainUndoStack].filter(elem => elem.undoObjId !== previousUndo.undoObjId);
       setMainUndoStack(newUndoStack);
 
       // Limpiar el canvas
       ctx.clearRect(0, 0, canvas.ref.current.width, canvas.ref.current.height);
 
-      // Buscar el índice del ultimo undoObj
-      const lastUndoObjIndex = layersUndoStacks[previousUndo.layerStackName].findIndex(elem => elem.undoObjId === previousUndo.undoObjId)
-
-      // Usar el índice del último undoObj para encontrar el undoObj anterior a ese
-      const previousObj = layersUndoStacks[previousUndo.layerStackName][lastUndoObjIndex - 1]
-      console.log(previousObj)
-      if (!previousObj) return
-
-      if (!previousObj.canvasDataURL) return
+      // Dibujar el undoObj anterior
+      if (!previousUndo.canvasDataURL) return
       const img = new Image();
-      img.src = previousObj.canvasDataURL;
+      img.src = previousUndo.canvasDataURL;
       img.onload = () => {
         ctx.drawImage(img, 0, 0);
       };
+    } else if(previousUndo.undoType === "newKeyframe") {
+      console.log(mainUndoStack)
+      // Ir a la capa del undo anterior
+      setSelectedLayer(previousUndo.layerData.layerName)
+
+      // Ir al frameIndex del undo anterior
+      console.log("frameIndex: " + previousUndo.frameIndex)
+      if(previousUndo.frameIndex !== undefined) setCurrentFrame(previousUndo.frameIndex)
+      
     }
   }
 
@@ -288,6 +306,8 @@ export const DataProvider = ({ children }: DataProviderProps) => {
       newLayers = newLayers.map(currentLayer => {
         if (currentLayer.layerName === selectedLayer) {
           if (currentFrame > currentLayer.keyframes.length - 1) {
+            
+            // Generar una lista de los nuevos keyframes y agregarlos a la capa
             let newKeyframesList: Keyframe[] = []
 
             for (let i = 0; i < currentFrame + 1; i++) {
@@ -295,11 +315,54 @@ export const DataProvider = ({ children }: DataProviderProps) => {
                 newKeyframesList = [...newKeyframesList, defaultKeyframe(selectedLayer)]
               }
             }
-
             currentLayer.keyframes = [...currentLayer.keyframes, newKeyframesList].flat()
+            
+            // Crear un nuevo undoObj
+            const newUndoObject = createUndoObj(
+              "newKeyframe",
+              currentLayer,
+              undefined,
+              selectedLayer,
+              nanoid(),
+              currentFrame,
+              undefined,
+              newKeyframesList
+            )
+
+            // Enviar el nuevo undoObj a mainUndoStack
+            setMainUndoStack(prev => [...prev, newUndoObject])
+
+            // Enviar el nuevo undoObj a layersUndoStack
+            setLayersUndoStacks(prevState => ({
+              ...prevState,
+              [selectedLayer]: prevState[selectedLayer] ? [...prevState[selectedLayer], newUndoObject] : [newUndoObject]
+            }));
+
           } else {
-            currentLayer.keyframes = [...currentLayer.keyframes, defaultKeyframe(selectedLayer)]
+            const newKeyframe = defaultKeyframe(selectedLayer)
+            currentLayer.keyframes = [...currentLayer.keyframes, newKeyframe]
             setCurrentFrame(currentLayer.keyframes.length - 1)
+
+            // Crear un nuevo undoObj
+            const newUndoObject = createUndoObj(
+              "newKeyframe",
+              currentLayer,
+              undefined,
+              selectedLayer,
+              nanoid(),
+              currentFrame,
+              undefined,
+              [newKeyframe]
+            )
+            
+            // Enviar el nuevo undoObj a mainUndoStack
+            setMainUndoStack(prev => [...prev, newUndoObject])
+
+            // Enviar el nuevo undoObj a layersUndoStack
+            setLayersUndoStacks(prevState => ({
+              ...prevState,
+              [selectedLayer]: prevState[selectedLayer] ? [...prevState[selectedLayer], newUndoObject] : [newUndoObject]
+            }));
           }
         }
         return currentLayer
@@ -358,6 +421,9 @@ export const DataProvider = ({ children }: DataProviderProps) => {
   }, [currentFrame])
 
 
+  useEffect(() => {
+    getKeyframesLength()
+  }, [layers])
 
 
   useEffect(() => {
