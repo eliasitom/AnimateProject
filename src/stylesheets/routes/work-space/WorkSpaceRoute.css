@@ -187,6 +187,16 @@
 }
 .ws-ls-body .layer p {
     margin-left: 10px;
+    user-select: none;
+}
+.ws-ls-body .layer .layername-input {
+    user-select: none;
+    margin-left: 10px;
+    font-size: 16px;
+    background-color: rgba(0, 0, 0, 0);
+    border: none;
+    border-bottom-style: dashed;
+    outline: none;
 }
 .layer-options {
     margin-right: 10px;
@@ -197,8 +207,8 @@
 }
 .layer-opacity-input {
     text-align: center;
-    width: 100px;
-    font-size: 18px;
+    width: 50px;
+    font-size: 14px;
     margin-right: 10px;
 }
 .layer-options svg {
@@ -264,10 +274,14 @@
 .ws-tls-body {
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+    overflow-y: auto;
+    height: 80%;
 }
 .ws-tls-body .keyframes-container {
     display: flex;
     height: 40px;
+    min-height: 40px;
     border-bottom: var(--border);
 }
 .ws-tls-body .selected-layer {

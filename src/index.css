@@ -41,6 +41,16 @@
   font-style: normal;
   text-transform: uppercase;
 }
+*::-webkit-scrollbar {
+  background-color: var(--color-2-bold);
+  border-radius: 20px;
+  width: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: #2d273178;
+  
+  border-radius: 20px;
+}
 
 
 .panel {

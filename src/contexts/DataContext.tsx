@@ -16,7 +16,8 @@ interface Keyframe {
 export interface Layer {
   layerName: string
   layerSettings: { opacity: number, hidden: boolean, lock: boolean, layerLevel: number }
-  keyframes: Keyframe[]
+  keyframes: Keyframe[],
+  id: string
 }
 
 const defaultLayerSettings = {
@@ -41,6 +42,7 @@ export const createLayer = (
     layerName,
     layerSettings: { ...defaultLayerSettings, layerLevel },
     keyframes: [initialKeyframe],
+    id: nanoid()
   };
 };
 
@@ -101,7 +103,7 @@ interface DataContextValue {
   setLayers: Dispatch<SetStateAction<Layer[]>>
   selectedLayer: string
   setSelectedLayer: Dispatch<SetStateAction<string>>
-  handleNewEmptyFrame: () => void
+  handleNewEmptyFrame: (method: "empty" | "clone") => void
   updateKeyframe: (layerName: string, dataURL: string, keyframeId: string) => void
   currentFrame: number
   setCurrentFrame: Dispatch<SetStateAction<number>>
@@ -136,7 +138,8 @@ export const DataProvider = ({ children }: DataProviderProps) => {
     layers: [{
       keyframes: [defaultKeyframe("Layer_0")],
       layerName: "Layer_0",
-      layerSettings: { layerLevel: 0, lock: false, opacity: 1, hidden: false }
+      layerSettings: { layerLevel: 0, lock: false, opacity: 1, hidden: false },
+      id: nanoid()
     }],
     undoId: nanoid(),
     currentFrameIndex: 0,
@@ -202,7 +205,7 @@ export const DataProvider = ({ children }: DataProviderProps) => {
   };
 
 
-  const handleNewEmptyFrame = () => {
+  const handleNewEmptyFrame = (method: "empty" | "clone") => {
     let newLayers = [...layers]
     let keyframesLength = 0
 
@@ -215,9 +218,17 @@ export const DataProvider = ({ children }: DataProviderProps) => {
           // Generar una lista de los nuevos keyframes y agregarlos a la capa
           let newKeyframesList: Keyframe[] = []
 
+          let newKeyframeTemplate
+          
+          if(method === "empty") {
+            newKeyframeTemplate = defaultKeyframe(selectedLayer)
+          } else {
+            newKeyframeTemplate = newCurrentLayer.keyframes[newCurrentLayer.keyframes.length - 1]
+          }
+
           for (let i = 0; i < currentFrame + 1; i++) {
             if (!newCurrentLayer.keyframes[i]) {
-              newKeyframesList = [...newKeyframesList, defaultKeyframe(selectedLayer)]
+              newKeyframesList = [...newKeyframesList, newKeyframeTemplate]
             }
           }
           newCurrentLayer.keyframes = [...newCurrentLayer.keyframes, newKeyframesList].flat()

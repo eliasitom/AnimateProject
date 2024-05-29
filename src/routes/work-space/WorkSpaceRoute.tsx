@@ -5,13 +5,14 @@ import { FaPaintBrush, FaEraser } from "react-icons/fa";
 import { IoArrowUndo, IoArrowRedo } from "react-icons/io5";
 import { BiLayerPlus } from "react-icons/bi";
 import { HiEye, HiEyeOff } from "react-icons/hi";
+import { TiArrowDownThick, TiArrowUpThick } from "react-icons/ti";
+import { TbDeviceIpadHorizontalPlus, TbDeviceTabletPlus } from "react-icons/tb";
 
 
 import { CustomCanvas } from "./CustomCanvas";
-import { useContext } from "react";
+import React, { useContext, useEffect, useState, useRef } from "react";
 import { DataContext, createLayer, createUndoObj, undoStackObject } from "../../contexts/DataContext";
 import { ToolsSectionBody } from "./ToolsSectionBody";
-import { TbDeviceIpadHorizontalPlus, TbDeviceTabletPlus } from "react-icons/tb";
 
 
 
@@ -39,12 +40,39 @@ export const WorkSpaceRoute = () => {
     handleNewEmptyFrame,
     currentFrame,
     setCurrentFrame,
-    keyframesLength
+    keyframesLength,
+    canvasRefs
   } = contextValues
 
   const mediaQueriesStyles = {
     display: windowWidth <= 768 ? "none" : "flex"
   }
+
+  /*
+  Cuando se entra en modo de edición de una capa 
+  (específicamente en edición del nombre de la capa) 
+  se cambia el estado a true y se establece el id de la capa
+  */
+  interface IsEditingLayer {
+    active: boolean,
+    layerId?: string
+  }
+  const [isEditingLayer, setIsEditingLayer] = useState<IsEditingLayer>({ active: false })
+  const [newLayerName, setNewLayerName] = useState<string>("")
+
+
+
+  const layersContainerRef = useRef<HTMLDivElement>(null);
+  const timelineContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleScroll = (source: 'container1' | 'container2') => {
+    const sourceContainer = source === 'container1' ? layersContainerRef.current : timelineContainerRef.current;
+    const targetContainer = source === 'container1' ? timelineContainerRef.current : layersContainerRef.current;
+
+    if (sourceContainer && targetContainer) {
+      targetContainer.scrollTop = sourceContainer.scrollTop;
+    }
+  };
 
 
 
@@ -67,22 +95,27 @@ export const WorkSpaceRoute = () => {
 
 
   const handleNewLayer = () => {
+    // Crear la nueva capa y agregarla a layers[]
+    const newLayerName = `Layer_` + (layers.length).toString()
+
+    const layerLevel = layers.length === 1 ? 1 : layers.length
+    const newLayer = createLayer(newLayerName, layerLevel)
+
+    let newLayers = [...layers]
+    newLayers = [...newLayers, newLayer]
+    setLayers(newLayers)
+
+    // Seleccionar la nueva capa
+    setSelectedLayer(newLayerName)
+
     // Crear un undoObj
     const newUndoObject: undoStackObject =
-      createUndoObj(selectedLayer, currentFrame, layers, "newLayer")
+      createUndoObj(newLayerName, currentFrame, newLayers, "newLayer")
 
     // Agregar el objeto a la linea principal de acciones (mainUndoStack)
     setMainUndoStack((prev: undoStackObject[]) => {
       return [...prev, newUndoObject]
     })
-
-    // Crear la nueva capa y agregarla a layers[]
-    const newLayerName = `Layer_` + (layers.length).toString()
-    const newLayer = createLayer(newLayerName, layers.length - 1)
-    setLayers(prev => [...prev, newLayer])
-
-    // Seleccionar la nueva capa
-    setSelectedLayer(newLayerName)
   }
 
   const handleLayerVisibility = (layerName: string) => {
@@ -101,23 +134,145 @@ export const WorkSpaceRoute = () => {
   const handleLayerOpacity = (e: React.ChangeEvent<HTMLInputElement>, layerName: string) => {
     e.preventDefault()
 
+    if (Number(e.target.value) > 1 || Number(e.target.value) < 0) return
     setLayers(prev => {
       let newLayers = [...prev]
 
       newLayers = newLayers.map(elem => {
-        if(elem.layerName === layerName) elem.layerSettings.opacity = Number(e.target.value)
+        if (elem.layerName === layerName) elem.layerSettings.opacity = Number(e.target.value)
         return elem
       })
       return newLayers
     })
   }
 
+  const handleIsEditingLayer = (layerId: string | undefined) => {
+    setIsEditingLayer(prev => {
+      if (prev.active) return { active: false }
+      else return { active: true, layerId }
+    })
+  }
+  const submitLayerName = (e: React.FormEvent<HTMLFormElement>, lastLayerName: string) => {
+    e.preventDefault()
+
+    let newLayers = [...layers]
+    const thisLayer = newLayers.find(elem => elem.layerName === lastLayerName)
+
+    // Verificar que no haya una capa con el mismo nombre para evitar problemas de sincronización.
+    if ([...newLayers].filter(elem => elem.layerName.toLocaleLowerCase() === newLayerName.toLocaleLowerCase() && elem.id !== thisLayer?.id).length > 0) {
+      return setIsEditingLayer({ active: false })
+    }
+
+    // Verificar que newLayerName no sea un string vacío.
+    if (newLayerName === "") {
+      return setIsEditingLayer({ active: false })
+    }
+
+
+    // Actualizar las capas
+    newLayers = newLayers.map(currentLayer => {
+      if (currentLayer.layerName === lastLayerName) {
+        currentLayer.layerName = newLayerName
+
+        currentLayer.keyframes = currentLayer.keyframes.map(currentKeyframe => {
+          currentKeyframe.parentLayerName = newLayerName
+          return currentKeyframe
+        })
+      }
+      return currentLayer
+    })
+    setLayers(newLayers)
+
+    // Actualizar los objetos undoStack
+    let newMainUndoStack = [...mainUndoStack]
+
+    newMainUndoStack = newMainUndoStack.map(currentUndo => {
+      // Actualizar la propiedad layers de undoObj
+      currentUndo.layers = currentUndo.layers.map(currentUndoLayer => {
+        //Actualizar las capas y buscar la capa que se renombrará
+        if (currentUndoLayer.layerName === lastLayerName) {
+          currentUndoLayer.layerName = newLayerName
+
+          // Actualizar los keyframes de la capa a actualizar
+          currentUndoLayer.keyframes = currentUndoLayer.keyframes.map(currentUndoKeyframe => {
+            currentUndoKeyframe.parentLayerName = newLayerName
+            return currentUndoKeyframe
+          })
+        }
+
+        return currentUndoLayer
+      })
+      // Actualizar la capa seleccionada de undoObj de ser necesario
+      if (currentUndo.selectedLayer === lastLayerName) currentUndo.selectedLayer = newLayerName
+
+      return currentUndo
+    })
+
+    // Actualizar canvasRefs
+    canvasRefs.map(currentRef => {
+      if (currentRef.layerName === lastLayerName) {
+        currentRef.layerName = newLayerName
+      }
+      return currentRef
+    })
+
+    setSelectedLayer(newLayerName)
+    setIsEditingLayer({ active: false })
+  }
+
+  function changeLayerLevel(event: "up" | "down", layerId: string) {
+    let newLayers = [...layers];
+    const layer = newLayers.find(elem => elem.id === layerId);
+    if (!layer) return;
+  
+    const layerIndex = layer.layerSettings.layerLevel;
+  
+    if (event === "up") {
+      if (layer.layerSettings.layerLevel < newLayers.length - 1) {
+        // Intercambiar los elementos en el array newLayers
+        [newLayers[layerIndex], newLayers[layerIndex + 1]] =
+          [newLayers[layerIndex + 1], newLayers[layerIndex]];
+  
+        // Actualizar la propiedad currentIndex de los objetos en newLayers
+        newLayers[layerIndex].layerSettings.layerLevel = layerIndex;
+        newLayers[layerIndex + 1].layerSettings.layerLevel = layerIndex + 1;
+  
+        // Intercambiar los elementos en el array canvasRefs.current
+        [canvasRefs[layerIndex], canvasRefs[layerIndex + 1]] =
+          [canvasRefs[layerIndex + 1], canvasRefs[layerIndex]];
+      }
+    } else {
+      if (layerIndex > 0) {
+        // Intercambiar los elementos en el array newLayers
+        [newLayers[layerIndex], newLayers[layerIndex - 1]] =
+          [newLayers[layerIndex - 1], newLayers[layerIndex]];
+  
+        // Actualizar la propiedad currentIndex de los objetos en newLayers
+        newLayers[layerIndex].layerSettings.layerLevel = layerIndex;
+        newLayers[layerIndex - 1].layerSettings.layerLevel = layerIndex - 1;
+  
+        // Intercambiar los elementos en el array canvasRefs.current
+        [canvasRefs[layerIndex], canvasRefs[layerIndex - 1]] =
+          [canvasRefs[layerIndex - 1], canvasRefs[layerIndex]];
+      }
+    }
+    console.log(newLayers);
+    setLayers(newLayers);
+  }
+  
+
+
+  useEffect(() => {
+    setNewLayerName(selectedLayer)
+    setIsEditingLayer({ active: false })
+  }, [selectedLayer])
+
 
 
 
   const undoStackDisplay = () => {
     return (
-      <div style={{ marginLeft: 10, overflow: "hidden", overflowY: "scroll", height: "100%" }}>
+      <div style={{ display: "flex", flexDirection: "column", marginLeft: 10, overflow: "hidden", overflowY: "scroll", height: "100%" }}>
         <h3>Undo Stack Display</h3>
         {
           mainUndoStack.map((elem, index) =>
@@ -173,9 +328,9 @@ export const WorkSpaceRoute = () => {
       </div>
       <div className="ws-canvas-section panel">
         {
-          layers.map((currentLayer, index) => (
+          layers.map((currentLayer) => (
             !currentLayer.layerSettings.hidden ?
-              <CustomCanvas key={index} layerData={currentLayer} />
+              <CustomCanvas key={currentLayer.id} layerData={currentLayer} />
               : undefined
           ))
         }
@@ -214,7 +369,7 @@ export const WorkSpaceRoute = () => {
         <aside className="ws-ls-aside">
 
         </aside>
-        <div className="ws-ls-body">
+        <div className="ws-ls-body" ref={layersContainerRef} onScroll={() => handleScroll("container1")}>
           {
             [...layers].reverse().map((elem, index) => (
               <div
@@ -222,8 +377,18 @@ export const WorkSpaceRoute = () => {
                 key={index}
                 onClick={() => setSelectedLayer(elem.layerName)}
               >
-                <p>{elem.layerName}</p>
+                {
+                  isEditingLayer.active && isEditingLayer.layerId === elem.id ?
+                    <form onSubmit={(e) => submitLayerName(e, elem.layerName)}>
+                      <input className="layername-input" value={newLayerName} onChange={e => setNewLayerName(e.target.value)} />
+                    </form> :
+                    <p onDoubleClick={() => handleIsEditingLayer(elem.id)}>
+                      {elem.layerName}
+                    </p>
+                }
                 <div className="layer-options">
+                  <TiArrowUpThick onClick={() => changeLayerLevel("up", elem.id)} />
+                  <TiArrowDownThick onClick={() => changeLayerLevel("down", elem.id)} />
                   <input
                     className="input1 layer-opacity-input"
                     type="number"
@@ -248,8 +413,8 @@ export const WorkSpaceRoute = () => {
         <header className="ws-tls-header">
           <p>Timeline</p>
           <div className="ws-tls-header-options">
-            <TbDeviceTabletPlus onClick={handleNewEmptyFrame} />
-            <TbDeviceIpadHorizontalPlus />
+            <TbDeviceTabletPlus onClick={() => handleNewEmptyFrame("empty")} />
+            <TbDeviceIpadHorizontalPlus onClick={() => handleNewEmptyFrame("clone")} />
           </div>
         </header>
         <aside className="ws-tls-nav">
@@ -257,7 +422,7 @@ export const WorkSpaceRoute = () => {
             frameIndexGenerator
           }
         </aside>
-        <div className="ws-tls-body">
+        <div className="ws-tls-body" ref={timelineContainerRef} onScroll={() => handleScroll("container2")}>
           {
             [...layers].reverse().map((currentLayer) => (
               <div
