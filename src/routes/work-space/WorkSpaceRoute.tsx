@@ -6,13 +6,14 @@ import { IoArrowUndo, IoArrowRedo } from "react-icons/io5";
 import { BiLayerPlus } from "react-icons/bi";
 import { HiEye, HiEyeOff } from "react-icons/hi";
 import { TiArrowDownThick, TiArrowUpThick } from "react-icons/ti";
-import { TbDeviceIpadHorizontalPlus, TbDeviceTabletPlus } from "react-icons/tb";
+import { TbDeviceIpadHorizontalPlus, TbDeviceTabletPlus, TbLayersSelected, TbLayersOff  } from "react-icons/tb";
 
 
 import { CustomCanvas } from "./CustomCanvas";
 import React, { useContext, useEffect, useState, useRef } from "react";
 import { DataContext, createLayer } from "../../contexts/DataContext";
 import { ToolsSectionBody } from "./ToolsSectionBody";
+import { OnionSkin } from "./OnionSkin";
 
 
 
@@ -65,6 +66,17 @@ export const WorkSpaceRoute = () => {
   const layersContainerRef = useRef<HTMLDivElement>(null);
   const timelineContainerRef = useRef<HTMLDivElement>(null);
 
+  const [showOnionSkin, setShowOnionSkin] = useState(true)
+
+
+
+
+
+
+
+
+
+
   const handleScroll = (source: 'container1' | 'container2') => {
     const sourceContainer = source === 'container1' ? layersContainerRef.current : timelineContainerRef.current;
     const targetContainer = source === 'container1' ? timelineContainerRef.current : layersContainerRef.current;
@@ -73,9 +85,6 @@ export const WorkSpaceRoute = () => {
       targetContainer.scrollTop = sourceContainer.scrollTop;
     }
   };
-
-
-
 
 
   // Generador de índices para el navegador del timeline
@@ -218,19 +227,19 @@ export const WorkSpaceRoute = () => {
     let newLayers = [...layers];
     const layer = newLayers.find(elem => elem.id === layerId);
     if (!layer) return;
-  
+
     const layerIndex = layer.layerSettings.layerLevel;
-  
+
     if (event === "up") {
       if (layer.layerSettings.layerLevel < newLayers.length - 1) {
         // Intercambiar los elementos en el array newLayers
         [newLayers[layerIndex], newLayers[layerIndex + 1]] =
           [newLayers[layerIndex + 1], newLayers[layerIndex]];
-  
+
         // Actualizar la propiedad currentIndex de los objetos en newLayers
         newLayers[layerIndex].layerSettings.layerLevel = layerIndex;
         newLayers[layerIndex + 1].layerSettings.layerLevel = layerIndex + 1;
-  
+
         // Intercambiar los elementos en el array canvasRefs.current
         [canvasRefs[layerIndex], canvasRefs[layerIndex + 1]] =
           [canvasRefs[layerIndex + 1], canvasRefs[layerIndex]];
@@ -240,11 +249,11 @@ export const WorkSpaceRoute = () => {
         // Intercambiar los elementos en el array newLayers
         [newLayers[layerIndex], newLayers[layerIndex - 1]] =
           [newLayers[layerIndex - 1], newLayers[layerIndex]];
-  
+
         // Actualizar la propiedad currentIndex de los objetos en newLayers
         newLayers[layerIndex].layerSettings.layerLevel = layerIndex;
         newLayers[layerIndex - 1].layerSettings.layerLevel = layerIndex - 1;
-  
+
         // Intercambiar los elementos en el array canvasRefs.current
         [canvasRefs[layerIndex], canvasRefs[layerIndex - 1]] =
           [canvasRefs[layerIndex - 1], canvasRefs[layerIndex]];
@@ -254,7 +263,7 @@ export const WorkSpaceRoute = () => {
     setLayers(newLayers);
     handleNewUndo(selectedLayer, currentFrame, newLayers, "layerPosition")
   }
-  
+
 
 
   useEffect(() => {
@@ -329,8 +338,21 @@ export const WorkSpaceRoute = () => {
               : undefined
           ))
         }
+        {
+          showOnionSkin ?
+            layers.map((currentLayer) => (
+              !currentLayer.layerSettings.hidden && currentFrame > 0 ?
+                <OnionSkin
+                  key={currentLayer.id}
+                  zIndex={currentLayer.layerSettings.layerLevel + 10}
+                  dataURL={currentLayer.keyframes[currentFrame - 1].dataURL}
+                />
+                : undefined
+            )) : undefined
+        }
         <canvas width={400} height={400} className="ws-cs-base" />
       </div>
+      <p>{currentFrame}</p>
       <div className="ws-tools-section panel" style={mediaQueriesStyles}>
         <aside className="ws-ts-aside">
           <div className="ws-ts-aside-tools">
@@ -408,6 +430,11 @@ export const WorkSpaceRoute = () => {
         <header className="ws-tls-header">
           <p>Timeline</p>
           <div className="ws-tls-header-options">
+            {
+              showOnionSkin ?
+              <TbLayersSelected style={{ marginRight: 30 }} onClick={() => setShowOnionSkin(!showOnionSkin)} />
+              : <TbLayersOff style={{ marginRight: 30 }} onClick={() => setShowOnionSkin(!showOnionSkin)} />
+            }
             <TbDeviceTabletPlus onClick={() => handleNewEmptyFrame("empty")} />
             <TbDeviceIpadHorizontalPlus onClick={() => handleNewEmptyFrame("clone")} />
           </div>

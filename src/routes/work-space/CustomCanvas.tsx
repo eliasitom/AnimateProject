@@ -155,7 +155,7 @@ export const CustomCanvas = ({ layerData }: CanvasProps) => {
   // Get Z-index
   useEffect(() => {
     const index = layers.findIndex(elem => elem.layerName === layerData.layerName)
-    setZIndex(index + 20)
+    setZIndex(index + 100)
   }, [layers])
 
 
