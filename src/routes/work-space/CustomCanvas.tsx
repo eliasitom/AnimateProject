@@ -1,5 +1,5 @@
 import { useContext, useState, useEffect, useRef } from "react";
-import { DataContext, createUndoObj, undoStackObject } from "../../contexts/DataContext";
+import { DataContext } from "../../contexts/DataContext";
 import {Layer} from "../../contexts/DataContext"
 type CanvasProps = {
   layerData: Layer
@@ -19,11 +19,11 @@ export const CustomCanvas = ({ layerData }: CanvasProps) => {
     canvasRefs,
     selectedLayer,
     registerCanvasRef,
-    setMainUndoStack,
-    mainUndoStack,
+    undoStack,
     layers,
     updateKeyframe,
-    currentFrame
+    currentFrame,
+    handleNewUndo
   } = contextValues
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -118,13 +118,7 @@ export const CustomCanvas = ({ layerData }: CanvasProps) => {
     updateKeyframe(layerData.layerName, canvasDataURL, keyframeId)
 
     // Crear un undoObj
-    const newUndoObject: undoStackObject =
-      createUndoObj(layerData.layerName, currentFrame, layers, "layerEvent")
-
-    // Agregar el objeto a la linea principal de acciones mainUndoStack
-    setMainUndoStack((prev: any) => {
-      return [...prev, newUndoObject]
-    })
+    handleNewUndo(layerData.layerName, currentFrame, layers, "layerEvent")
   };
 
   const handleMouseLeave = () => {
@@ -136,7 +130,7 @@ export const CustomCanvas = ({ layerData }: CanvasProps) => {
     if (!canvas) return 
 
     // Buscar el valor anterior del canvas en layersStacks
-    const previousLayer = mainUndoStack[mainUndoStack.length - 1].layers.find(elem => {
+    const previousLayer = undoStack[undoStack.length - 1].layers.find(elem => {
       if (elem.layerName === layerData.layerName) return elem
     })
     if (
@@ -152,13 +146,8 @@ export const CustomCanvas = ({ layerData }: CanvasProps) => {
 
 
     // Crear un undoObj
-    const newUndoObject: undoStackObject =
-      createUndoObj(selectedLayer, currentFrame, layers)
+    handleNewUndo(selectedLayer, currentFrame, layers, undefined)
 
-    // Agregar el objeto a la linea principal de acciones mainUndoStack
-    setMainUndoStack((prev: any) => {
-      return [...prev, newUndoObject]
-    })
   };
 
 

@@ -57,10 +57,10 @@ interface CanvasRef {
 }
 
 export interface undoStackObject {
-  undoType?: "layerEvent" | "newLayer" | "newKeyframe",
-  selectedLayer: string,
-  currentFrameIndex: number,
-  layers: Layer[],
+  undoType?: string | undefined
+  selectedLayer: string
+  currentFrameIndex: number
+  layers: Layer[]
   undoId: string
 }
 
@@ -68,7 +68,7 @@ export const createUndoObj = (
   selectedLayer: string,
   currentFrameIndex: number,
   layers: Layer[],
-  undoType?: "layerEvent" | "newLayer" | "newKeyframe"
+  undoType?: string | undefined
 ): undoStackObject => {
   return {
     selectedLayer,
@@ -93,8 +93,7 @@ interface DataContextValue {
   setBrushSize: Dispatch<SetStateAction<number>>
   canvasRefs: CanvasRef[]
   registerCanvasRef: (layerName: string, ref: React.RefObject<HTMLCanvasElement>) => void
-  mainUndoStack: undoStackObject[]
-  setMainUndoStack: Dispatch<SetStateAction<undoStackObject[]>>
+  undoStack: undoStackObject[]
   redoStack: undoStackObject[]
   setRedoStack: Dispatch<SetStateAction<undoStackObject[]>>
   handleUndo: () => void
@@ -109,6 +108,7 @@ interface DataContextValue {
   setCurrentFrame: Dispatch<SetStateAction<number>>
   keyframesLength: number
   setKeyframesLength: Dispatch<SetStateAction<number>>
+  handleNewUndo: (selectedLayer_: string | undefined, currentFrame_: number | undefined, layers_: Layer[] | undefined, undoType_: string | undefined) => void
 }
 
 
@@ -145,7 +145,7 @@ export const DataProvider = ({ children }: DataProviderProps) => {
     currentFrameIndex: 0,
     selectedLayer: "Layer_0"
   }
-  const [mainUndoStack, setMainUndoStack] = useState<undoStackObject[]>([defaultUndoObj]);
+  const [undoStack, setUndoStack] = useState<undoStackObject[]>([defaultUndoObj]);
   const [redoStack, setRedoStack] = useState<undoStackObject[]>([]);
 
   // Crear un layer inicial genérico
@@ -170,9 +170,26 @@ export const DataProvider = ({ children }: DataProviderProps) => {
 
 
 
+  const handleNewUndo = (selectedLayer_: string | undefined, currentFrame_: number | undefined, layers_: Layer[] | undefined, undoType_: string | undefined) => {
+
+    // Crear un undoObj
+    const newUndoObject: undoStackObject =
+      createUndoObj(
+        selectedLayer_ ? selectedLayer_ : selectedLayer,
+         currentFrame_ ? currentFrame_ : currentFrame, 
+         layers_ ? layers_ : layers,
+         undoType_ ? undoType_ : "empty"
+        )
+
+    // Agregar el objeto a la linea principal de acciones mainUndoStack
+    setUndoStack((prev: any) => {
+      return [...prev, newUndoObject]
+    })
+  }
+
   const handleUndo = () => {
-    const previousUndoObj = mainUndoStack[mainUndoStack.length - 2]
-    const lastUndoObj = mainUndoStack[mainUndoStack.length - 1]
+    const previousUndoObj = undoStack[undoStack.length - 2]
+    const lastUndoObj = undoStack[undoStack.length - 1]
 
     // Actualizar el estado global de la aplicacion: layers, selectedFrame, currentFrameIndex
     setLayers(previousUndoObj.layers)
@@ -180,7 +197,7 @@ export const DataProvider = ({ children }: DataProviderProps) => {
     setCurrentFrame(previousUndoObj.currentFrameIndex)
 
     // Eliminar el último valor de mainUndoStack y agregarlo a redoStack
-    setMainUndoStack(prev => {
+    setUndoStack(prev => {
       const newUndoStack = [...prev].filter(elem => elem.undoId !== lastUndoObj.undoId)
       return newUndoStack
     })
@@ -196,12 +213,12 @@ export const DataProvider = ({ children }: DataProviderProps) => {
     setCurrentFrame(lastRedoObj.currentFrameIndex)
 
     // Actualizar mainUndoStack y redoStack
-    setMainUndoStack(prev => [...prev, lastRedoObj])
+    setUndoStack(prev => [...prev, lastRedoObj])
     setRedoStack(prev => {
       const newRedoStack = [...prev].filter(elem => elem.undoId !== lastRedoObj.undoId)
       return newRedoStack
     })
-    
+
   };
 
 
@@ -219,8 +236,8 @@ export const DataProvider = ({ children }: DataProviderProps) => {
           let newKeyframesList: Keyframe[] = []
 
           let newKeyframeTemplate
-          
-          if(method === "empty") {
+
+          if (method === "empty") {
             newKeyframeTemplate = defaultKeyframe(selectedLayer)
           } else {
             newKeyframeTemplate = newCurrentLayer.keyframes[newCurrentLayer.keyframes.length - 1]
@@ -245,22 +262,14 @@ export const DataProvider = ({ children }: DataProviderProps) => {
     setLayers(newLayers)
 
     // Crear un nuevo undoObj
-    const newUndoObject = createUndoObj(
-      selectedLayer,
-      keyframesLength,
-      newLayers,
-      "newKeyframe"
-    )
-
-    // Enviar el nuevo undoObj a mainUndoStack
-    setMainUndoStack(prev => [...prev, newUndoObject])
+    handleNewUndo(selectedLayer, keyframesLength, newLayers, "newKeyframe")
   }
 
 
 
 
   // Actualizar un keyframe luego de dibujar en el (esta función se llama desde el canvas luego de modificarlo)
-  const updateKeyframe = (layerName: string, dataURL: string, keyframeId: string) => {    
+  const updateKeyframe = (layerName: string, dataURL: string, keyframeId: string) => {
     let newLayers = [...layers]
 
     newLayers = newLayers.map(currentLayer => {
@@ -322,8 +331,7 @@ export const DataProvider = ({ children }: DataProviderProps) => {
     setBrushSize,
     canvasRefs: canvasRefs.current,
     registerCanvasRef,
-    mainUndoStack,
-    setMainUndoStack,
+    undoStack,
     redoStack,
     setRedoStack,
     handleUndo,
@@ -337,7 +345,8 @@ export const DataProvider = ({ children }: DataProviderProps) => {
     currentFrame,
     setCurrentFrame,
     keyframesLength,
-    setKeyframesLength
+    setKeyframesLength,
+    handleNewUndo
   };
 
   return (

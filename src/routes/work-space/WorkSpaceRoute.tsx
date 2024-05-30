@@ -11,7 +11,7 @@ import { TbDeviceIpadHorizontalPlus, TbDeviceTabletPlus } from "react-icons/tb";
 
 import { CustomCanvas } from "./CustomCanvas";
 import React, { useContext, useEffect, useState, useRef } from "react";
-import { DataContext, createLayer, createUndoObj, undoStackObject } from "../../contexts/DataContext";
+import { DataContext, createLayer } from "../../contexts/DataContext";
 import { ToolsSectionBody } from "./ToolsSectionBody";
 
 
@@ -29,8 +29,8 @@ export const WorkSpaceRoute = () => {
     brushSize,
     setTool,
     mainColor,
-    mainUndoStack,
-    setMainUndoStack,
+    undoStack,
+    handleNewUndo,
     handleUndo,
     handleRedo,
     layers,
@@ -109,13 +109,7 @@ export const WorkSpaceRoute = () => {
     setSelectedLayer(newLayerName)
 
     // Crear un undoObj
-    const newUndoObject: undoStackObject =
-      createUndoObj(newLayerName, currentFrame, newLayers, "newLayer")
-
-    // Agregar el objeto a la linea principal de acciones (mainUndoStack)
-    setMainUndoStack((prev: undoStackObject[]) => {
-      return [...prev, newUndoObject]
-    })
+    handleNewUndo(newLayerName, currentFrame, newLayers, "newLayer")
   }
 
   const handleLayerVisibility = (layerName: string) => {
@@ -184,7 +178,7 @@ export const WorkSpaceRoute = () => {
     setLayers(newLayers)
 
     // Actualizar los objetos undoStack
-    let newMainUndoStack = [...mainUndoStack]
+    let newMainUndoStack = [...undoStack]
 
     newMainUndoStack = newMainUndoStack.map(currentUndo => {
       // Actualizar la propiedad layers de undoObj
@@ -258,6 +252,7 @@ export const WorkSpaceRoute = () => {
     }
     console.log(newLayers);
     setLayers(newLayers);
+    handleNewUndo(selectedLayer, currentFrame, newLayers, "layerPosition")
   }
   
 
@@ -275,7 +270,7 @@ export const WorkSpaceRoute = () => {
       <div style={{ display: "flex", flexDirection: "column", marginLeft: 10, overflow: "hidden", overflowY: "scroll", height: "100%" }}>
         <h3>Undo Stack Display</h3>
         {
-          mainUndoStack.map((elem, index) =>
+          undoStack.map((elem, index) =>
             elem.undoType ?
               <div key={index} style={{ marginBottom: 15 }}>
                 <p>ID: {elem.undoId}</p>
