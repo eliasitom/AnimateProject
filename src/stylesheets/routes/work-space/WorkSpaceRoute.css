@@ -231,9 +231,20 @@
     align-items: center;
     justify-content: space-between
 }
-.ws-tls-header p {
+.ws-tls-header-1 {
+    display: flex;
+    align-items: center;
+}
+.ws-tls-header-1 .title {
     font-size: 22px;
     margin-left: 10px;
+}
+.ws-tls-hader-frames-indicator {
+    margin-left: 20px;
+    font-size: 16px;
+}
+.ws-tls-header-2 input{
+width: 50px;
 }
 .ws-tls-header-options {
     font-size: 25px;

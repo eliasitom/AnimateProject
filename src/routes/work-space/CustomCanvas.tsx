@@ -1,6 +1,9 @@
 import { useContext, useState, useEffect, useRef } from "react";
 import { DataContext } from "../../contexts/DataContext";
 import {Layer} from "../../contexts/DataContext"
+
+
+
 type CanvasProps = {
   layerData: Layer
 }
@@ -23,7 +26,8 @@ export const CustomCanvas = ({ layerData }: CanvasProps) => {
     layers,
     updateKeyframe,
     currentFrame,
-    handleNewUndo
+    handleNewUndo,
+    checkKeyframes,
   } = contextValues
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -119,6 +123,9 @@ export const CustomCanvas = ({ layerData }: CanvasProps) => {
 
     // Crear un undoObj
     handleNewUndo(layerData.layerName, currentFrame, layers, "layerEvent")
+
+    // Verificar si algun keyframe de cualquier capa está vacío
+    checkKeyframes()
   };
 
   const handleMouseLeave = () => {

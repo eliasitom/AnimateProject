@@ -6,7 +6,8 @@ import { IoArrowUndo, IoArrowRedo } from "react-icons/io5";
 import { BiLayerPlus } from "react-icons/bi";
 import { HiEye, HiEyeOff } from "react-icons/hi";
 import { TiArrowDownThick, TiArrowUpThick } from "react-icons/ti";
-import { TbDeviceIpadHorizontalPlus, TbDeviceTabletPlus, TbLayersSelected, TbLayersOff  } from "react-icons/tb";
+import { TbDeviceIpadHorizontalPlus, TbDeviceTabletPlus, TbLayersSelected, TbLayersOff } from "react-icons/tb";
+import {ImLoop} from "react-icons/im"
 
 
 import { CustomCanvas } from "./CustomCanvas";
@@ -42,7 +43,12 @@ export const WorkSpaceRoute = () => {
     currentFrame,
     setCurrentFrame,
     keyframesLength,
-    canvasRefs
+    canvasRefs,
+    handlePlay,
+    onionSkin,
+    setOnionSkin,
+    frameRate,
+    setFrameRate
   } = contextValues
 
   const mediaQueriesStyles = {
@@ -66,7 +72,6 @@ export const WorkSpaceRoute = () => {
   const layersContainerRef = useRef<HTMLDivElement>(null);
   const timelineContainerRef = useRef<HTMLDivElement>(null);
 
-  const [showOnionSkin, setShowOnionSkin] = useState(true)
 
 
 
@@ -187,9 +192,9 @@ export const WorkSpaceRoute = () => {
     setLayers(newLayers)
 
     // Actualizar los objetos undoStack
-    let newMainUndoStack = [...undoStack]
+    let newUndoStack = [...undoStack]
 
-    newMainUndoStack = newMainUndoStack.map(currentUndo => {
+    newUndoStack = newUndoStack.map(currentUndo => {
       // Actualizar la propiedad layers de undoObj
       currentUndo.layers = currentUndo.layers.map(currentUndoLayer => {
         //Actualizar las capas y buscar la capa que se renombrará
@@ -271,6 +276,23 @@ export const WorkSpaceRoute = () => {
     setIsEditingLayer({ active: false })
   }, [selectedLayer])
 
+  // Detectar F7 (nuevo fotograma)
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'F7') {
+        handleNewEmptyFrame("empty")
+      }
+    };
+
+    // Agregar el evento al montar el componente
+    window.addEventListener('keydown', handleKeyDown);
+
+    // Limpiar el evento al desmontar el componente
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleNewEmptyFrame]); // El array vacío asegura que este efecto se ejecute solo una vez
+
 
 
 
@@ -339,9 +361,9 @@ export const WorkSpaceRoute = () => {
           ))
         }
         {
-          showOnionSkin ?
+          onionSkin ?
             layers.map((currentLayer) => (
-              !currentLayer.layerSettings.hidden && currentFrame > 0 ?
+              !currentLayer.layerSettings.hidden && currentLayer.keyframes[currentFrame - 1] ?
                 <OnionSkin
                   key={currentLayer.id}
                   zIndex={currentLayer.layerSettings.layerLevel + 10}
@@ -352,7 +374,6 @@ export const WorkSpaceRoute = () => {
         }
         <canvas width={400} height={400} className="ws-cs-base" />
       </div>
-      <p>{currentFrame}</p>
       <div className="ws-tools-section panel" style={mediaQueriesStyles}>
         <aside className="ws-ts-aside">
           <div className="ws-ts-aside-tools">
@@ -428,13 +449,25 @@ export const WorkSpaceRoute = () => {
       </div>
       <div className="ws-timeline-section panel">
         <header className="ws-tls-header">
-          <p>Timeline</p>
+          <div className="ws-tls-header-1">
+            <p className="title">Timeline</p>
+            <p className="ws-tls-hader-frames-indicator">{currentFrame + 1} / {keyframesLength}</p>
+          </div>
+          <label className="ws-tls-header-2">
+            <input 
+            className="input1"
+            type="number"
+             value={frameRate} 
+             onChange={e => setFrameRate(Number(e.target.value))}
+             />/s
+          </label>
           <div className="ws-tls-header-options">
             {
-              showOnionSkin ?
-              <TbLayersSelected style={{ marginRight: 30 }} onClick={() => setShowOnionSkin(!showOnionSkin)} />
-              : <TbLayersOff style={{ marginRight: 30 }} onClick={() => setShowOnionSkin(!showOnionSkin)} />
+              onionSkin ?
+                <TbLayersSelected style={{ marginRight: 30 }} onClick={() => setOnionSkin(!onionSkin)} />
+                : <TbLayersOff style={{ marginRight: 30 }} onClick={() => setOnionSkin(!onionSkin)} />
             }
+            <ImLoop />
             <TbDeviceTabletPlus onClick={() => handleNewEmptyFrame("empty")} />
             <TbDeviceIpadHorizontalPlus onClick={() => handleNewEmptyFrame("clone")} />
           </div>
@@ -456,12 +489,12 @@ export const WorkSpaceRoute = () => {
                     <div
                       className="keyframe"
                       key={index}
-                      onClick={() => handleKeyframeClick(index, currentLayer.layerName)}
+                      onClick={() => {
+                        handleKeyframeClick(index, currentLayer.layerName)
+                        handlePlay(currentKeyframe.dataURL)
+                      }}
                     >
                       <div className={`keyframe-state ${currentKeyframe.state === "filled" ? "keyframe-state-filled" : ""}`} />
-                      {
-                        currentKeyframe.state === "filled" ? "f" : "e"
-                      }
                     </div>
                   ))
                 }

@@ -109,6 +109,14 @@ interface DataContextValue {
   keyframesLength: number
   setKeyframesLength: Dispatch<SetStateAction<number>>
   handleNewUndo: (selectedLayer_: string | undefined, currentFrame_: number | undefined, layers_: Layer[] | undefined, undoType_: string | undefined) => void
+  checkKeyframes: () => void
+  handlePlay: (dataURL: string) => void
+  isPlaying: boolean
+  setIsPlaying: Dispatch<SetStateAction<boolean>>
+  onionSkin: boolean
+  setOnionSkin: Dispatch<SetStateAction<boolean>>
+  frameRate: number
+  setFrameRate: Dispatch<SetStateAction<number>>
 }
 
 
@@ -119,6 +127,7 @@ export const DataContext = createContext<DataContextValue | null>(null)
 
 
 export const DataProvider = ({ children }: DataProviderProps) => {
+  const [isPlaying, setIsPlaying] = useState(false)
   const canvasRefs = useRef<CanvasRef[]>([]);
 
   const registerCanvasRef = useCallback((layerName: string, ref: React.RefObject<HTMLCanvasElement>) => {
@@ -154,11 +163,14 @@ export const DataProvider = ({ children }: DataProviderProps) => {
   // Inicializar el estado con ese layer
   const [layers, setLayers] = useState<Layer[]>([initialLayer]);
   const [selectedLayer, setSelectedLayer] = useState<string>("Layer_0")
+  const [buffers, setBuffers] = useState<HTMLCanvasElement[][]>([]);
 
   const [currentFrame, setCurrentFrame] = useState(0)
   const [keyframesLength, setKeyframesLength] = useState(1)
+  const [frameRate, setFrameRate] = useState(2)
 
-
+  // Onion Skin
+  const [onionSkin, setOnionSkin] = useState(true)
 
 
   const getKeyframesLength = () => {
@@ -170,18 +182,92 @@ export const DataProvider = ({ children }: DataProviderProps) => {
 
 
 
+  // PlayMode
+  useEffect(() => {
+    // Precargar las imágenes y crear los buffers
+    const loadBuffers = async () => {
+      const buffers = await Promise.all(layers.map(async (layer) => {
+        return Promise.all(layer.keyframes.map(async (frame) => {
+          const bufferCanvas = document.createElement("canvas");
+          const ctx = bufferCanvas.getContext("2d");
+          if (!ctx) return bufferCanvas;
+
+          const img = new Image();
+          img.src = frame.dataURL;
+
+          return new Promise<HTMLCanvasElement>((resolve) => {
+            img.onload = () => {
+              bufferCanvas.width = img.width;
+              bufferCanvas.height = img.height;
+              ctx.drawImage(img, 0, 0);
+              resolve(bufferCanvas);
+            };
+
+            img.onerror = () => resolve(bufferCanvas);
+          });
+        }));
+      }));
+
+      setBuffers(buffers);
+    };
+
+    loadBuffers();
+  }, [layers]);
+
+  const handlePlay = () => {
+    setIsPlaying(true);
+    setOnionSkin(false);
+
+    let counter = currentFrame;
+    const intervalTime = 1000 / frameRate; // Calcula el tiempo entre cada fotograma en milisegundos
+
+    const playAnimation = () => {
+      if (counter >= keyframesLength - 1) {
+        setOnionSkin(true);
+        setIsPlaying(false);
+        return;
+      }
+      setTimeout(playAnimation, intervalTime); // Usa setTimeout en lugar de requestAnimationFrame
+
+
+      canvasRefs.current.forEach((currentRef, index) => {
+        const layerBuffers = buffers[index];
+        if (!layerBuffers) return;
+
+        const frontCanvas = currentRef.ref.current;
+        if (!frontCanvas) return;
+
+        const ctx = frontCanvas.getContext("2d");
+        if (!ctx) return;
+
+        const bufferCanvas = layerBuffers[counter + 1];
+        if (!bufferCanvas) return;
+
+        ctx.clearRect(0, 0, frontCanvas.width, frontCanvas.height);
+        ctx.drawImage(bufferCanvas, 0, 0);
+      });
+
+      counter++;
+      setCurrentFrame(counter);
+    };
+
+    playAnimation(); // Inicia la animación
+  };
+
+
+
   const handleNewUndo = (selectedLayer_: string | undefined, currentFrame_: number | undefined, layers_: Layer[] | undefined, undoType_: string | undefined) => {
 
     // Crear un undoObj
     const newUndoObject: undoStackObject =
       createUndoObj(
         selectedLayer_ ? selectedLayer_ : selectedLayer,
-         currentFrame_ ? currentFrame_ : currentFrame, 
-         layers_ ? layers_ : layers,
-         undoType_ ? undoType_ : "empty"
-        )
+        currentFrame_ ? currentFrame_ : currentFrame,
+        layers_ ? layers_ : layers,
+        undoType_ ? undoType_ : "empty"
+      )
 
-    // Agregar el objeto a la linea principal de acciones mainUndoStack
+    // Agregar el objeto a la linea principal de acciones undoStack
     setUndoStack((prev: any) => {
       return [...prev, newUndoObject]
     })
@@ -196,7 +282,7 @@ export const DataProvider = ({ children }: DataProviderProps) => {
     setSelectedLayer(previousUndoObj.selectedLayer)
     setCurrentFrame(previousUndoObj.currentFrameIndex)
 
-    // Eliminar el último valor de mainUndoStack y agregarlo a redoStack
+    // Eliminar el último valor de undoStack y agregarlo a redoStack
     setUndoStack(prev => {
       const newUndoStack = [...prev].filter(elem => elem.undoId !== lastUndoObj.undoId)
       return newUndoStack
@@ -212,7 +298,7 @@ export const DataProvider = ({ children }: DataProviderProps) => {
     setSelectedLayer(lastRedoObj.selectedLayer)
     setCurrentFrame(lastRedoObj.currentFrameIndex)
 
-    // Actualizar mainUndoStack y redoStack
+    // Actualizar undoStack y redoStack
     setUndoStack(prev => [...prev, lastRedoObj])
     setRedoStack(prev => {
       const newRedoStack = [...prev].filter(elem => elem.undoId !== lastRedoObj.undoId)
@@ -291,6 +377,8 @@ export const DataProvider = ({ children }: DataProviderProps) => {
 
   // Dibujar las capas actuales luego de cambiar de frame o hacer CTRL + Z
   useEffect(() => {
+    if(isPlaying) return
+    
     canvasRefs.current.map((currentRef) => {
       const canvasRef = currentRef.ref.current
       if (!canvasRef) return
@@ -314,7 +402,59 @@ export const DataProvider = ({ children }: DataProviderProps) => {
         ctx.drawImage(img, 0, 0);
       };
     })
-  }, [currentFrame, layers])
+  }, [undoStack, redoStack, currentFrame])
+
+  // Verificar si el canvas está vacio o no
+  const isCanvasEmpty = async (dataURL: string) => {
+    const image = new Image();
+    image.src = dataURL;
+
+    await new Promise((resolve) => {
+      image.onload = resolve;
+    });
+
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = image.width;
+    tempCanvas.height = image.height;
+
+    const ctx = tempCanvas.getContext('2d');
+    if (!ctx) return
+
+    ctx.drawImage(image, 0, 0);
+    const pixelData = ctx.getImageData(0, 0, tempCanvas.width, tempCanvas.height).data;
+
+    for (let i = 3; i < pixelData.length; i += 4) {
+      if (pixelData[i] !== 0) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const checkKeyframes = () => {
+    const updateLayers = async () => {
+      const newLayers = await Promise.all(
+        layers.map(async (currentLayer) => {
+          const newCurrentLayer = { ...currentLayer };
+
+          newCurrentLayer.keyframes = await Promise.all(
+            newCurrentLayer.keyframes.map(async (currentKeyframe) => {
+              const isEmpty = await isCanvasEmpty(currentKeyframe.dataURL);
+              if (isEmpty) currentKeyframe.state = 'empty';
+              else currentKeyframe.state = 'filled';
+              return currentKeyframe;
+            })
+          );
+
+          return newCurrentLayer;
+        })
+      );
+
+      setLayers(newLayers);
+    };
+
+    updateLayers();
+  }
 
 
   useEffect(() => {
@@ -346,7 +486,15 @@ export const DataProvider = ({ children }: DataProviderProps) => {
     setCurrentFrame,
     keyframesLength,
     setKeyframesLength,
-    handleNewUndo
+    handleNewUndo,
+    checkKeyframes,
+    handlePlay,
+    isPlaying,
+    setIsPlaying,
+    onionSkin,
+    setOnionSkin,
+    frameRate,
+    setFrameRate
   };
 
   return (
