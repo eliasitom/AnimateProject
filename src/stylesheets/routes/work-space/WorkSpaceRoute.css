@@ -239,9 +239,33 @@
     font-size: 22px;
     margin-left: 10px;
 }
-.ws-tls-hader-frames-indicator {
+.ws-tls-header-frames-indicator {
     margin-left: 20px;
     font-size: 16px;
+    width: 50px;
+}
+.ws-tls-header-playback-section {
+    margin-left: 20px;
+    font-size: 22px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+}
+.ws-tls-header-playback-section svg {
+    margin: 0 5px 0 5px;
+    cursor: pointer;
+}
+.ws-tls-header-loop-option {
+    margin-left: 20px;
+    font-size: 22px;
+    opacity: .5;
+    cursor: pointer;
+}
+.ws-tls-header-loop-option-active {
+    margin-left: 20px;
+    font-size: 22px;
+    opacity: 1;
+    cursor: pointer;
 }
 .ws-tls-header-2 input{
 width: 50px;

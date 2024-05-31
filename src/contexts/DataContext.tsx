@@ -1,4 +1,4 @@
-import React, { createContext, ReactNode, useState, useRef, Dispatch, SetStateAction, useCallback, useEffect } from "react"
+import React, { createContext, ReactNode, useState, useRef, Dispatch, SetStateAction, useCallback, useEffect, RefAttributes } from "react"
 import { nanoid } from "nanoid"
 
 
@@ -110,13 +110,16 @@ interface DataContextValue {
   setKeyframesLength: Dispatch<SetStateAction<number>>
   handleNewUndo: (selectedLayer_: string | undefined, currentFrame_: number | undefined, layers_: Layer[] | undefined, undoType_: string | undefined) => void
   checkKeyframes: () => void
-  handlePlay: (dataURL: string) => void
+  handlePlay: () => void
   isPlaying: boolean
   setIsPlaying: Dispatch<SetStateAction<boolean>>
   onionSkin: boolean
   setOnionSkin: Dispatch<SetStateAction<boolean>>
+  isLoop: boolean
+  setIsLoop: Dispatch<SetStateAction<boolean>>
   frameRate: number
   setFrameRate: Dispatch<SetStateAction<number>>
+  handleStop: () => void
 }
 
 
@@ -167,10 +170,10 @@ export const DataProvider = ({ children }: DataProviderProps) => {
 
   const [currentFrame, setCurrentFrame] = useState(0)
   const [keyframesLength, setKeyframesLength] = useState(1)
-  const [frameRate, setFrameRate] = useState(2)
-
+  const [frameRate, setFrameRate] = useState(24)
   // Onion Skin
   const [onionSkin, setOnionSkin] = useState(true)
+  const [isLoop, setIsLoop] = useState(false)
 
 
   const getKeyframesLength = () => {
@@ -182,7 +185,9 @@ export const DataProvider = ({ children }: DataProviderProps) => {
 
 
 
-  // PlayMode
+  // Agrega shouldStop al estado
+  const shouldStopRef = useRef(false);
+
   useEffect(() => {
     // Precargar las imágenes y crear los buffers
     const loadBuffers = async () => {
@@ -212,23 +217,38 @@ export const DataProvider = ({ children }: DataProviderProps) => {
     };
 
     loadBuffers();
-  }, [layers]);
+  }, [layers, setBuffers]);
 
   const handlePlay = () => {
+    const prevOnionLayerValue = onionSkin
+
     setIsPlaying(true);
     setOnionSkin(false);
+    shouldStopRef.current = false
 
     let counter = currentFrame;
     const intervalTime = 1000 / frameRate; // Calcula el tiempo entre cada fotograma en milisegundos
 
+    if (counter === keyframesLength - 1) counter = -1;
+
     const playAnimation = () => {
-      if (counter >= keyframesLength - 1) {
-        setOnionSkin(true);
+      if (shouldStopRef.current) {
+        setOnionSkin(prevOnionLayerValue);
         setIsPlaying(false);
         return;
-      }
-      setTimeout(playAnimation, intervalTime); // Usa setTimeout en lugar de requestAnimationFrame
+      } // Detener la animación si shouldStop es true
 
+      if (counter >= keyframesLength - 1) {
+        if (isLoop) {
+          counter = -1;
+        } else {
+          setOnionSkin(prevOnionLayerValue);
+          setIsPlaying(false);
+          return;
+        }
+      }
+
+      setTimeout(playAnimation, intervalTime); // Usa setTimeout en lugar de requestAnimationFrame
 
       canvasRefs.current.forEach((currentRef, index) => {
         const layerBuffers = buffers[index];
@@ -254,6 +274,10 @@ export const DataProvider = ({ children }: DataProviderProps) => {
     playAnimation(); // Inicia la animación
   };
 
+  const handleStop = () => {
+    shouldStopRef.current = true;
+    setIsPlaying(false);
+  };
 
 
   const handleNewUndo = (selectedLayer_: string | undefined, currentFrame_: number | undefined, layers_: Layer[] | undefined, undoType_: string | undefined) => {
@@ -377,8 +401,8 @@ export const DataProvider = ({ children }: DataProviderProps) => {
 
   // Dibujar las capas actuales luego de cambiar de frame o hacer CTRL + Z
   useEffect(() => {
-    if(isPlaying) return
-    
+    if (isPlaying) return
+
     canvasRefs.current.map((currentRef) => {
       const canvasRef = currentRef.ref.current
       if (!canvasRef) return
@@ -403,6 +427,10 @@ export const DataProvider = ({ children }: DataProviderProps) => {
       };
     })
   }, [undoStack, redoStack, currentFrame])
+
+
+
+
 
   // Verificar si el canvas está vacio o no
   const isCanvasEmpty = async (dataURL: string) => {
@@ -494,7 +522,10 @@ export const DataProvider = ({ children }: DataProviderProps) => {
     onionSkin,
     setOnionSkin,
     frameRate,
-    setFrameRate
+    setFrameRate,
+    isLoop,
+    setIsLoop,
+    handleStop
   };
 
   return (

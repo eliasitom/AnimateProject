@@ -1,13 +1,13 @@
 import { useResolution } from "../../custom-hooks/useResolutions"
 import "../../stylesheets/routes/work-space/WorkSpaceRoute.css"
 
-import { FaPaintBrush, FaEraser } from "react-icons/fa";
-import { IoArrowUndo, IoArrowRedo } from "react-icons/io5";
+import { FaPaintBrush, FaEraser, FaPlay, FaStop } from "react-icons/fa";
+import { IoArrowUndo, IoArrowRedo, IoPlayBackSharp, IoPlayForwardSharp } from "react-icons/io5";
 import { BiLayerPlus } from "react-icons/bi";
 import { HiEye, HiEyeOff } from "react-icons/hi";
 import { TiArrowDownThick, TiArrowUpThick } from "react-icons/ti";
 import { TbDeviceIpadHorizontalPlus, TbDeviceTabletPlus, TbLayersSelected, TbLayersOff } from "react-icons/tb";
-import {ImLoop} from "react-icons/im"
+import { ImLoop } from "react-icons/im"
 
 
 import { CustomCanvas } from "./CustomCanvas";
@@ -48,7 +48,11 @@ export const WorkSpaceRoute = () => {
     onionSkin,
     setOnionSkin,
     frameRate,
-    setFrameRate
+    setFrameRate,
+    isPlaying,
+    isLoop,
+    setIsLoop,
+    handleStop
   } = contextValues
 
   const mediaQueriesStyles = {
@@ -264,7 +268,6 @@ export const WorkSpaceRoute = () => {
           [canvasRefs[layerIndex - 1], canvasRefs[layerIndex]];
       }
     }
-    console.log(newLayers);
     setLayers(newLayers);
     handleNewUndo(selectedLayer, currentFrame, newLayers, "layerPosition")
   }
@@ -451,15 +454,28 @@ export const WorkSpaceRoute = () => {
         <header className="ws-tls-header">
           <div className="ws-tls-header-1">
             <p className="title">Timeline</p>
-            <p className="ws-tls-hader-frames-indicator">{currentFrame + 1} / {keyframesLength}</p>
+            <p className="ws-tls-header-frames-indicator">{currentFrame + 1} / {keyframesLength}</p>
+            <div className="ws-tls-header-playback-section">
+              <IoPlayBackSharp />
+              {
+                isPlaying ?
+                  <FaStop onClick={handleStop} /> :
+                  <FaPlay onClick={handlePlay} />
+              }
+              <IoPlayForwardSharp />
+            </div>
+            <ImLoop 
+            className={isLoop ? "ws-tls-header-loop-option-active" : "ws-tls-header-loop-option"}
+            onClick={() => setIsLoop(!isLoop)}
+            />
           </div>
           <label className="ws-tls-header-2">
-            <input 
-            className="input1"
-            type="number"
-             value={frameRate} 
-             onChange={e => setFrameRate(Number(e.target.value))}
-             />/s
+            <input
+              className="input1"
+              type="number"
+              value={frameRate}
+              onChange={e => setFrameRate(Number(e.target.value))}
+            />/s
           </label>
           <div className="ws-tls-header-options">
             {
@@ -467,7 +483,6 @@ export const WorkSpaceRoute = () => {
                 <TbLayersSelected style={{ marginRight: 30 }} onClick={() => setOnionSkin(!onionSkin)} />
                 : <TbLayersOff style={{ marginRight: 30 }} onClick={() => setOnionSkin(!onionSkin)} />
             }
-            <ImLoop />
             <TbDeviceTabletPlus onClick={() => handleNewEmptyFrame("empty")} />
             <TbDeviceIpadHorizontalPlus onClick={() => handleNewEmptyFrame("clone")} />
           </div>
@@ -491,7 +506,6 @@ export const WorkSpaceRoute = () => {
                       key={index}
                       onClick={() => {
                         handleKeyframeClick(index, currentLayer.layerName)
-                        handlePlay(currentKeyframe.dataURL)
                       }}
                     >
                       <div className={`keyframe-state ${currentKeyframe.state === "filled" ? "keyframe-state-filled" : ""}`} />
