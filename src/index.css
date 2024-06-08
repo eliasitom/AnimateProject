@@ -11,24 +11,19 @@
 */
 
 :root {
-  --color-0: #9fc695;
-  --color-1: #89b87e;
-  --color-2: #e9dfaa;
-  --color-2-bold: #c8be8f;
-  --color-3: #2d2731;
-  --color-4: #79d0b3;
+  --color-0: #979E7C;
+  --color-3: #22260F;
 
   --border: solid 3px #2d2731;
-  --box-shadow: -5px 5px 0 #2d2731;
+  --box-shadow: -5px 5px 0 #22260F;
 }
 
 #root {
   width: 100vw;
   height: 100vh;
 
-  background-color: #80cb6d;
+  background-color: #6e745a;
   opacity: 1;
-  background-image: linear-gradient(#77be66 4px, transparent 4px), linear-gradient(to right, #77be66 4px, #80cb6d 4px);
   background-size: 80px 80px;
 }
 
@@ -40,6 +35,7 @@
   font-weight: bold;
   font-style: normal;
   text-transform: uppercase;
+  color: #22260F;
 }
 *::-webkit-scrollbar {
   background-color: var(--color-2-bold);
@@ -51,17 +47,28 @@
   
   border-radius: 20px;
 }
+svg {
+  color: #22260F;
+}
 
 
 .panel {
-  background-color: var(--color-2);
-  box-shadow: var(--box-shadow);
+  background-color: var(--color-0);
   border: var(--border);
+  box-shadow: var(--box-shadow);
 }
+
 
 .input1 {
   border: none;
   border-bottom-style: dashed;
   background-color: rgba(0, 0, 0, 0);
   outline: none;
+}
+.input1[type=number] {
+  -webkit-appearance: none;
+  appearance: none;
+}
+.input1[type=number]::-webkit-inner-spin-button {
+  display: none;
 }

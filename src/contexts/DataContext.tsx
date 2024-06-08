@@ -1,4 +1,4 @@
-import React, { createContext, ReactNode, useState, useRef, Dispatch, SetStateAction, useCallback, useEffect, RefAttributes } from "react"
+import React, { createContext, ReactNode, useState, useRef, Dispatch, SetStateAction, useCallback, useEffect } from "react"
 import { nanoid } from "nanoid"
 
 
@@ -84,6 +84,9 @@ export const createUndoObj = (
 
 
 
+
+
+
 interface DataContextValue {
   mainColor: string;
   setMainColor: (color: string) => void;
@@ -159,7 +162,8 @@ export const DataProvider = ({ children }: DataProviderProps) => {
   }
   const [undoStack, setUndoStack] = useState<undoStackObject[]>([defaultUndoObj]);
   const [redoStack, setRedoStack] = useState<undoStackObject[]>([]);
-
+  const stacksMaxLength = 6
+  
   // Crear un layer inicial genérico
   const initialLayer = createLayer("Layer_0", 0);
 
@@ -177,7 +181,7 @@ export const DataProvider = ({ children }: DataProviderProps) => {
 
 
   const getKeyframesLength = () => {
-    const newKeyframesLength = layers.reduce((max, layer) => (layer.keyframes.length > max ? layer.keyframes.length : max), -Infinity);
+    const newKeyframesLength = [...layers].reduce((max, layer) => (layer.keyframes.length > max ? layer.keyframes.length : max), -Infinity);
     setKeyframesLength(newKeyframesLength)
   }
 
@@ -280,55 +284,64 @@ export const DataProvider = ({ children }: DataProviderProps) => {
   };
 
 
-  const handleNewUndo = (selectedLayer_: string | undefined, currentFrame_: number | undefined, layers_: Layer[] | undefined, undoType_: string | undefined) => {
-
-    // Crear un undoObj
-    const newUndoObject: undoStackObject =
-      createUndoObj(
-        selectedLayer_ ? selectedLayer_ : selectedLayer,
-        currentFrame_ ? currentFrame_ : currentFrame,
-        layers_ ? layers_ : layers,
-        undoType_ ? undoType_ : "empty"
-      )
-
-    // Agregar el objeto a la linea principal de acciones undoStack
-    setUndoStack((prev: any) => {
-      return [...prev, newUndoObject]
-    })
-  }
+  const handleNewUndo = (
+    selectedLayer_: string | undefined,
+    currentFrame_: number | undefined,
+    layers_: Layer[] | undefined,
+    undoType_: string | undefined
+  ) => {
+    const newUndoObject: undoStackObject = createUndoObj(
+      selectedLayer_ ? selectedLayer_ : selectedLayer,
+      currentFrame_ ? currentFrame_ : currentFrame,
+      layers_ ? JSON.parse(JSON.stringify(layers_)) : JSON.parse(JSON.stringify(layers)), // Copy deeply
+      undoType_ ? undoType_ : "empty"
+    );
+  
+    setUndoStack(prev => {
+      const newStack = [...prev, newUndoObject];
+      if (newStack.length > stacksMaxLength) {
+        newStack.shift();
+      }
+      return newStack;
+    });
+  
+    setRedoStack([]);
+  };
+  
+ 
 
   const handleUndo = () => {
-    const previousUndoObj = undoStack[undoStack.length - 2]
-    const lastUndoObj = undoStack[undoStack.length - 1]
-
-    // Actualizar el estado global de la aplicacion: layers, selectedFrame, currentFrameIndex
-    setLayers(previousUndoObj.layers)
-    setSelectedLayer(previousUndoObj.selectedLayer)
-    setCurrentFrame(previousUndoObj.currentFrameIndex)
-
-    // Eliminar el último valor de undoStack y agregarlo a redoStack
-    setUndoStack(prev => {
-      const newUndoStack = [...prev].filter(elem => elem.undoId !== lastUndoObj.undoId)
-      return newUndoStack
-    })
-    setRedoStack(prev => [...prev, lastUndoObj])
-  }
-
+    if (undoStack.length <= 1) return;
+  
+    const previousUndoObj = undoStack[undoStack.length - 2];
+    const lastUndoObj = undoStack[undoStack.length - 1];
+  
+    setLayers(previousUndoObj.layers);
+    setSelectedLayer(previousUndoObj.selectedLayer);
+    setCurrentFrame(previousUndoObj.currentFrameIndex);
+  
+    setUndoStack(prev => prev.slice(0, -1));
+    setRedoStack(prev => [...prev, lastUndoObj]);
+  };
+  
   const handleRedo = () => {
-    const lastRedoObj = redoStack[redoStack.length - 1]
-
-    // Actualizar el estado global de la aplicacion: layers, selectedFrame, currentFrameIndex
-    setLayers(lastRedoObj.layers)
-    setSelectedLayer(lastRedoObj.selectedLayer)
-    setCurrentFrame(lastRedoObj.currentFrameIndex)
-
-    // Actualizar undoStack y redoStack
-    setUndoStack(prev => [...prev, lastRedoObj])
-    setRedoStack(prev => {
-      const newRedoStack = [...prev].filter(elem => elem.undoId !== lastRedoObj.undoId)
-      return newRedoStack
-    })
-
+    if (redoStack.length === 0) return;
+  
+    const lastRedoObj = redoStack[redoStack.length - 1];
+  
+    setLayers(lastRedoObj.layers);
+    setSelectedLayer(lastRedoObj.selectedLayer);
+    setCurrentFrame(lastRedoObj.currentFrameIndex);
+  
+    setUndoStack(prev => {
+      const newUndoStack = [...prev, lastRedoObj];
+      if (newUndoStack.length > stacksMaxLength) {
+        newUndoStack.shift();
+      }
+      return newUndoStack;
+    });
+  
+    setRedoStack(prev => prev.slice(0, -1));
   };
 
 
@@ -379,21 +392,13 @@ export const DataProvider = ({ children }: DataProviderProps) => {
 
 
   // Actualizar un keyframe luego de dibujar en el (esta función se llama desde el canvas luego de modificarlo)
-  const updateKeyframe = (layerName: string, dataURL: string, keyframeId: string) => {
+  const updateKeyframe = (layerId: string, dataURL: string, keyframeId: string) => {
     let newLayers = [...layers]
 
-    newLayers = newLayers.map(currentLayer => {
-      let currentNewLayer = { ...currentLayer }
-      if (currentNewLayer.layerName === layerName) {
-        currentNewLayer.keyframes = currentNewLayer.keyframes.map(currentKeyframe => {
-          if (currentKeyframe.id === keyframeId) {
-            currentKeyframe.dataURL = dataURL
-          }
-          return currentKeyframe
-        })
-      }
-      return currentNewLayer
-    })
+    const layerIndex = newLayers.findIndex(elem => elem.id === layerId)
+    const keyframeIndex = newLayers[layerIndex].keyframes.findIndex(elem => elem.id === keyframeId)
+
+    newLayers[layerIndex].keyframes[keyframeIndex].dataURL = dataURL
 
     setLayers(newLayers)
   }
@@ -410,7 +415,7 @@ export const DataProvider = ({ children }: DataProviderProps) => {
       if (!ctx) return
 
       // Buscar la capa correspondiente
-      const layer = layers.find(elem => elem.layerName === currentRef.layerName)
+      const layer = [...layers].find(elem => elem.layerName === currentRef.layerName)
 
       if (!layer) return
 
@@ -426,7 +431,7 @@ export const DataProvider = ({ children }: DataProviderProps) => {
         ctx.drawImage(img, 0, 0);
       };
     })
-  }, [undoStack, redoStack, currentFrame])
+  }, [undoStack, redoStack, currentFrame, layers])
 
 
 
@@ -462,23 +467,22 @@ export const DataProvider = ({ children }: DataProviderProps) => {
   const checkKeyframes = () => {
     const updateLayers = async () => {
       const newLayers = await Promise.all(
-        layers.map(async (currentLayer) => {
+        [...layers].map(async (currentLayer) => {
           const newCurrentLayer = { ...currentLayer };
-
           newCurrentLayer.keyframes = await Promise.all(
             newCurrentLayer.keyframes.map(async (currentKeyframe) => {
-              const isEmpty = await isCanvasEmpty(currentKeyframe.dataURL);
+              const isEmpty = await isCanvasEmpty({...currentKeyframe}.dataURL);
               if (isEmpty) currentKeyframe.state = 'empty';
               else currentKeyframe.state = 'filled';
               return currentKeyframe;
             })
           );
-
           return newCurrentLayer;
         })
       );
 
       setLayers(newLayers);
+
     };
 
     updateLayers();
@@ -488,6 +492,7 @@ export const DataProvider = ({ children }: DataProviderProps) => {
   useEffect(() => {
     getKeyframesLength()
   }, [layers])
+
 
 
   const value: DataContextValue = {

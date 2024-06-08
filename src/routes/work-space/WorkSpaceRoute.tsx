@@ -32,6 +32,7 @@ export const WorkSpaceRoute = () => {
     setTool,
     mainColor,
     undoStack,
+    redoStack,
     handleNewUndo,
     handleUndo,
     handleRedo,
@@ -298,17 +299,16 @@ export const WorkSpaceRoute = () => {
 
 
 
-
+  const [displayMode, setDisplayMode] = useState("undo")
   const undoStackDisplay = () => {
     return (
       <div style={{ display: "flex", flexDirection: "column", marginLeft: 10, overflow: "hidden", overflowY: "scroll", height: "100%" }}>
-        <h3>Undo Stack Display</h3>
+        <h3 onClick={() => setDisplayMode(displayMode === "undo" ? "redo" : "undo")}>{displayMode === "undo" ? "Undo" : "Redo"} Stack Display</h3>
         {
-          undoStack.map((elem, index) =>
-            elem.undoType ?
+          (displayMode === "undo" ? [...undoStack] : [...redoStack]).map((elem, index) =>
               <div key={index} style={{ marginBottom: 15 }}>
                 <p>ID: {elem.undoId}</p>
-                <p>Type: {elem.undoType}</p>
+                <p>Type: {elem.undoType || "initialObject"}</p>
                 <div>
                   {
                     elem.layers.map((currentLayer, index) => (
@@ -335,7 +335,6 @@ export const WorkSpaceRoute = () => {
                   }
                 </div>
               </div>
-              : undefined
           )
         }
       </div>
@@ -350,12 +349,10 @@ export const WorkSpaceRoute = () => {
           <p>File</p>
         </header>
         <div className="ws-fs-body" style={{ height: "500px" }}>
-          {
-            undoStackDisplay()
-          }
+          {undoStackDisplay()}
         </div>
       </div>
-      <div className="ws-canvas-section panel">
+      <div className="ws-canvas-section">
         {
           layers.map((currentLayer) => (
             !currentLayer.layerSettings.hidden ?

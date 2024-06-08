@@ -36,7 +36,7 @@
     width: 100%;
     height: 25px;
     cursor: pointer;
-    background: var(--color-0);
+    background: #6e745a;
     box-shadow: inset var(--box-shadow);
 }
 
@@ -57,7 +57,8 @@
     width: 30px;
     height: 30px;
     margin: 5px;
-    box-shadow: var(--box-shadow);
+    box-shadow: inset -5px 5px 0 var(--color-3);
+    
     cursor: pointer;
 }
 .ws-ts-color-item:hover {
