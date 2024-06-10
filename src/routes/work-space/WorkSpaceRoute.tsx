@@ -12,7 +12,7 @@ import { ImLoop } from "react-icons/im"
 
 import { CustomCanvas } from "./CustomCanvas";
 import React, { useContext, useEffect, useState, useRef } from "react";
-import { DataContext, createLayer } from "../../contexts/DataContext";
+import { DataContext, createLayer, Keyframe } from "../../contexts/DataContext";
 import { ToolsSectionBody } from "./ToolsSectionBody";
 import { OnionSkin } from "./OnionSkin";
 
@@ -109,6 +109,16 @@ export const WorkSpaceRoute = () => {
   const handleKeyframeClick = (index: number, layerName: string) => {
     setCurrentFrame(index)
     setSelectedLayer(layerName)
+  }
+  const isExtendedKeyframe = (prev: Keyframe, current: Keyframe, next: Keyframe) => {
+    if(!prev || prev.id !== current.id) {
+      if(next && current.id === next.id) return "extended-keyframe-start"
+    } 
+    if(!next || next.id !== current.id) {
+      if(prev && current.id === prev.id) return "extended-keyframe-end"
+    } else if((prev && prev.id === current.id) || (next && next.id === current.id)) {
+      return "extended-keyframe-middle"
+    }
   }
 
 
@@ -372,7 +382,8 @@ export const WorkSpaceRoute = () => {
                 : undefined
             )) : undefined
         }
-        <canvas width={400} height={400} className="ws-cs-base" />
+        <div className="ws-cs-limits"/>
+        <canvas width={400} height={400} className="ws-cs-base" onContextMenu={e => e.preventDefault()} />
       </div>
       <div className="ws-tools-section panel" style={mediaQueriesStyles}>
         <aside className="ws-ts-aside">
@@ -499,7 +510,8 @@ export const WorkSpaceRoute = () => {
                 {
                   currentLayer.keyframes.map((currentKeyframe, index) => (
                     <div
-                      className="keyframe"
+                      className={`keyframe 
+                        ${isExtendedKeyframe(currentLayer.keyframes[index - 1], currentKeyframe, currentLayer.keyframes[index + 1])}`}
                       key={index}
                       onClick={() => {
                         handleKeyframeClick(index, currentLayer.layerName)

@@ -68,6 +68,16 @@
     touch-action: none;
 }
 
+
+
+.ws-cs-limits {
+    height: 80%;
+    aspect-ratio: 1 / 1;
+    border: var(--border);
+    position: absolute;
+    pointer-events: none;
+    z-index: 9999;
+}
 .ws-cs-base {
     height: 80%;
     aspect-ratio: 1 / 1;
@@ -224,7 +234,7 @@
 }
 
 .ws-ls-body .selected-layer {
-    background-color: var(--color-2-bold);
+    background-color: var(--color-1);
 }
 
 .ws-ls-body .layer {
@@ -401,7 +411,7 @@
 }
 
 .ws-tls-body .selected-layer {
-    background-color: var(--color-2-bold);
+    background-color: var(--color-1);
 }
 
 .ws-tls-body .keyframe:first-child {
@@ -416,6 +426,15 @@
     background-color: var(--color-0);
     position: relative;
     cursor: pointer;
+}
+.extended-keyframe-start {
+    border-right: solid 3px #2d273100 !important;
+}
+.extended-keyframe-middle {
+    border-right: solid 3px #2d273100 !important;
+}
+.extended-keyframe-end div:first-child, .extended-keyframe-middle div:first-child {
+    display: none;
 }
 
 .ws-tls-body .keyframe .keyframe-state {

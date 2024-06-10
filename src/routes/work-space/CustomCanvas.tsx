@@ -22,7 +22,6 @@ export const CustomCanvas = ({ layerData }: CanvasProps) => {
     canvasRefs,
     selectedLayer,
     registerCanvasRef,
-    undoStack,
     layers,
     updateKeyframe,
     currentFrame,
@@ -123,7 +122,7 @@ export const CustomCanvas = ({ layerData }: CanvasProps) => {
     updateKeyframe(layerData.id, canvasDataURL, keyframeId)
 
     // Actualiza layers localmente antes de crear el undoObj
-    const updatedLayers = [...layers];
+    const updatedLayers = [...layers]; // Negativo
     updatedLayers[layerIndex].keyframes[currentFrame].dataURL = canvasDataURL;
 
     handleNewUndo(layerData.layerName, currentFrame, updatedLayers, "layerEvent");
@@ -142,6 +141,16 @@ export const CustomCanvas = ({ layerData }: CanvasProps) => {
     setZIndex(index + 100)
   }, [layers])
 
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if(!canvas) return
+
+    canvas.addEventListener('pointerdown', (event) => {
+      if (event.pointerType === 'pen' && event.button === 2) {
+        event.preventDefault(); // Esto puede evitar el click derecho.
+      }
+    });
+  }, [])
 
 
   return (
@@ -159,7 +168,8 @@ export const CustomCanvas = ({ layerData }: CanvasProps) => {
         pointerEvents: selectedLayer === layerData.layerName ? "auto" : "none",
         cursor: isDrawable() === false ? "not-allowed" : "auto",
         opacity: layerData.layerSettings.opacity
-      }}
+        }}
+      onContextMenu={e => e.preventDefault()}
     />
   );
 };

@@ -1,0 +1,128 @@
+[33mcommit 426558dff0f78d24a6c1d3fb5af26f3412a8b1cf[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m
+Author: Elias <eliasespondaburucontacto0@gmail.com>
+Date:   Sat Jun 8 01:47:58 2024 -0300
+
+    feat: Change in application styles
+    
+    Now the application has a monochrome color palette.
+    
+    The main panel of the canvas section will no longer be visible,
+    this is to make it easier to add a system to rotate the canvas in the future.
+
+[33mcommit 463a7b80ed443f84d8d619908120c718e85ccca8[m
+Author: Elias <eliasespondaburucontacto0@gmail.com>
+Date:   Fri May 31 09:00:18 2024 -0300
+
+    feat: break animation and loop mode
+    
+    The animation can now be stopped thanks to a new icon implemented in the timeline header.
+    Furthermore, the animation is no longer played by clicking on a keyframe,
+    but from the same icon that is modified depending on the "isPlaying" state.
+    The animation breaking method is managed thanks to the use of a ref called "shouldStopRef".
+    
+    In addition, there is now a new playback mode: "loop mode".
+    It is established from the header of the timeline.
+
+[33mcommit 9ea051163936fe858de42812b894870a4f4028d6[m
+Author: Elias <eliasespondaburucontacto0@gmail.com>
+Date:   Fri May 31 03:17:32 2024 -0300
+
+    feat: new playback system.
+    
+    Now the animation can be played by clicking on any frame on the timeline.
+    The playback system follows the Double buffering design.
+    And it is managed from DataContext.
+
+[33mcommit a481b832888e5771a4a41365d97b9238f78bb67d[m
+Author: Elias <eliasespondaburucontacto0@gmail.com>
+Date:   Thu May 30 18:23:02 2024 -0300
+
+    feat: New onion skin system.
+    
+    Now you can see the previous layer with a transparency.
+    This is achieved with a new OnionSkin component, which renders the previous frame with transparency.
+
+[33mcommit 0b377106886239b4c10824b77744d0cf0b80679d[m
+Author: Elias <eliasespondaburucontacto0@gmail.com>
+Date:   Thu May 30 17:47:16 2024 -0300
+
+    fix: Minor fixes in the undo and redo system.
+    
+    Now moving a level layer counts as a valid action for the undoStack, and the undoObject.undoType system has also been slightly modified
+
+[33mcommit 31744343bc4c804d342d0c4d3d0c35f69c0a42f4[m
+Author: Elias <eliasespondaburucontacto0@gmail.com>
+Date:   Wed May 29 06:25:05 2024 -0300
+
+    feat: New layer options
+    
+    Now you can rename a layer by double clicking on its name.
+    Additionally, you can change the position of the layers using two icons that are shown in the layers section.
+    
+    Slight improvement in the keyframe creation function (handleNewEmptyFrame):
+    Now the function needs a method as a parameter, which defines whether the new keyframes will be empty or a copy of the last keyframe of the layer.
+
+[33mcommit 6f8cfa5190119dd7c9199fc74f061299322016f5[m
+Author: Elias <eliasespondaburucontacto0@gmail.com>
+Date:   Tue May 28 09:37:58 2024 -0300
+
+    feat: Major changes in undo and redo system
+    
+    Undo System: Now each Object stores the global state of the application at the time the object is created and not the specific event.
+    
+    Layer Options: Layers can now be hidden and their opacity changed.
+
+[33mcommit 85d6094b52f32f5f4084f8438d391aa9f61c966c[m
+Author: Elias <eliasespondaburucontacto0@gmail.com>
+Date:   Tue May 28 02:54:41 2024 -0300
+
+    chore: security backup before major changes
+    
+    This commit serves as a checkpoint before implementing
+    significant changes to the system and application behavior.
+    This backup ensures we have a stable version to revert to in
+    case the new changes cause unexpected issues or failures.
+    
+    This will primarily save the integrity of the undo
+    and redo system, as changes will be made to how they
+    work and how data is stored in the following states:
+    mainUndoStack, redoStack, layersUndoStack.
+
+[33mcommit b890bba53a31292fa55f34713472b0d8dabab096[m
+Author: Elias <eliasespondaburucontacto0@gmail.com>
+Date:   Mon May 27 06:36:23 2024 -0300
+
+    feat: You can't draw in impossible situations
+    feat: File section content
+    
+    New system:
+    When you try to draw on a layer that does not
+    have a keyframe for the current frame index,
+    the cursor changes icon and it will be impossible
+    to draw.
+    
+    I temporarily added a temporary container in file
+    section to be able to display
+    undoStack and redoStack
+
+[33mcommit 0ea2728585988e538603d8309235e018c2cb1d8f[m
+Author: Elias <eliasespondaburucontacto0@gmail.com>
+Date:   Mon May 27 04:07:44 2024 -0300
+
+    feat: first version.
+    
+    Implementations so far:
+    -drawing system. With two 4 functional tools:
+    brush, eraser, undo, redo; Additionally,
+    there are properties for some tools,
+    colors for the brush, and stroke size for the
+    brush and eraser.
+    
+    -layer system:
+    multiple layers that are rendered in different
+    zIndex and have different properties.
+    
+    -keyframe system:
+    Each frame stores individual properties,
+    and you can navigate between different frames on
+    different layers.

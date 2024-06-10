@@ -6,7 +6,7 @@ import { nanoid } from "nanoid"
 
 
 
-interface Keyframe {
+export interface Keyframe {
   dataURL: string
   state: "empty" | "filled"
   parentLayerName: string
@@ -73,10 +73,7 @@ export const createUndoObj = (
   return {
     selectedLayer,
     currentFrameIndex,
-    layers: layers.map(layer => ({
-      ...layer,
-      keyframes: layer.keyframes.map(keyframe => ({ ...keyframe }))
-    })),
+    layers: structuredClone(layers),
     undoId: nanoid(),
     undoType
   };
@@ -163,7 +160,7 @@ export const DataProvider = ({ children }: DataProviderProps) => {
   const [undoStack, setUndoStack] = useState<undoStackObject[]>([defaultUndoObj]);
   const [redoStack, setRedoStack] = useState<undoStackObject[]>([]);
   const stacksMaxLength = 6
-  
+
   // Crear un layer inicial genérico
   const initialLayer = createLayer("Layer_0", 0);
 
@@ -293,46 +290,50 @@ export const DataProvider = ({ children }: DataProviderProps) => {
     const newUndoObject: undoStackObject = createUndoObj(
       selectedLayer_ ? selectedLayer_ : selectedLayer,
       currentFrame_ ? currentFrame_ : currentFrame,
-      layers_ ? JSON.parse(JSON.stringify(layers_)) : JSON.parse(JSON.stringify(layers)), // Copy deeply
+      layers_ ? structuredClone(layers_) : structuredClone(layers), // Copy deeply
       undoType_ ? undoType_ : "empty"
     );
-  
+
     setUndoStack(prev => {
-      const newStack = [...prev, newUndoObject];
+      const newStack = structuredClone(prev);
       if (newStack.length > stacksMaxLength) {
         newStack.shift();
       }
-      return newStack;
+      return [...newStack, newUndoObject];
     });
-  
+
     setRedoStack([]);
   };
-  
- 
+
+
 
   const handleUndo = () => {
     if (undoStack.length <= 1) return;
-  
+
     const previousUndoObj = undoStack[undoStack.length - 2];
     const lastUndoObj = undoStack[undoStack.length - 1];
-  
+
     setLayers(previousUndoObj.layers);
     setSelectedLayer(previousUndoObj.selectedLayer);
     setCurrentFrame(previousUndoObj.currentFrameIndex);
-  
-    setUndoStack(prev => prev.slice(0, -1));
+
+    setUndoStack(prev => {
+      let newStack = structuredClone(prev)
+      newStack.pop()
+      return newStack
+    });
     setRedoStack(prev => [...prev, lastUndoObj]);
   };
-  
+
   const handleRedo = () => {
     if (redoStack.length === 0) return;
-  
+
     const lastRedoObj = redoStack[redoStack.length - 1];
-  
+
     setLayers(lastRedoObj.layers);
     setSelectedLayer(lastRedoObj.selectedLayer);
     setCurrentFrame(lastRedoObj.currentFrameIndex);
-  
+
     setUndoStack(prev => {
       const newUndoStack = [...prev, lastRedoObj];
       if (newUndoStack.length > stacksMaxLength) {
@@ -340,7 +341,7 @@ export const DataProvider = ({ children }: DataProviderProps) => {
       }
       return newUndoStack;
     });
-  
+
     setRedoStack(prev => prev.slice(0, -1));
   };
 
@@ -359,7 +360,6 @@ export const DataProvider = ({ children }: DataProviderProps) => {
           let newKeyframesList: Keyframe[] = []
 
           let newKeyframeTemplate
-
           if (method === "empty") {
             newKeyframeTemplate = defaultKeyframe(selectedLayer)
           } else {
@@ -373,10 +373,15 @@ export const DataProvider = ({ children }: DataProviderProps) => {
           }
           newCurrentLayer.keyframes = [...newCurrentLayer.keyframes, newKeyframesList].flat()
         } else {
-          const newKeyframe = defaultKeyframe(selectedLayer)
-          newCurrentLayer.keyframes = [...newCurrentLayer.keyframes, newKeyframe]
-          setCurrentFrame(newCurrentLayer.keyframes.length - 1)
-          keyframesLength = newCurrentLayer.keyframes.length - 1
+          let newKeyframe
+            if(method === "empty") {
+              newKeyframe = defaultKeyframe(selectedLayer)
+            } else {
+              newKeyframe = newCurrentLayer.keyframes[newCurrentLayer.keyframes.length-1]
+            }
+            newCurrentLayer.keyframes = [...newCurrentLayer.keyframes, newKeyframe]
+            setCurrentFrame(newCurrentLayer.keyframes.length - 1)
+            keyframesLength = newCurrentLayer.keyframes.length - 1
         }
       }
       return newCurrentLayer
@@ -393,7 +398,7 @@ export const DataProvider = ({ children }: DataProviderProps) => {
 
   // Actualizar un keyframe luego de dibujar en el (esta función se llama desde el canvas luego de modificarlo)
   const updateKeyframe = (layerId: string, dataURL: string, keyframeId: string) => {
-    let newLayers = [...layers]
+    let newLayers = structuredClone(layers)
 
     const layerIndex = newLayers.findIndex(elem => elem.id === layerId)
     const keyframeIndex = newLayers[layerIndex].keyframes.findIndex(elem => elem.id === keyframeId)
@@ -464,14 +469,15 @@ export const DataProvider = ({ children }: DataProviderProps) => {
     return true;
   };
 
+  // Verificar si el keyframe está vacío
   const checkKeyframes = () => {
     const updateLayers = async () => {
       const newLayers = await Promise.all(
-        [...layers].map(async (currentLayer) => {
-          const newCurrentLayer = { ...currentLayer };
+        structuredClone(layers).map(async (currentLayer) => {
+          const newCurrentLayer = currentLayer;
           newCurrentLayer.keyframes = await Promise.all(
             newCurrentLayer.keyframes.map(async (currentKeyframe) => {
-              const isEmpty = await isCanvasEmpty({...currentKeyframe}.dataURL);
+              const isEmpty = await isCanvasEmpty(currentKeyframe.dataURL);
               if (isEmpty) currentKeyframe.state = 'empty';
               else currentKeyframe.state = 'filled';
               return currentKeyframe;
@@ -480,11 +486,8 @@ export const DataProvider = ({ children }: DataProviderProps) => {
           return newCurrentLayer;
         })
       );
-
       setLayers(newLayers);
-
     };
-
     updateLayers();
   }
 

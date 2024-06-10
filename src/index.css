@@ -12,6 +12,7 @@
 
 :root {
   --color-0: #979E7C;
+  --color-1: #767c5e;
   --color-3: #22260F;
 
   --border: solid 3px #2d2731;
@@ -56,6 +57,7 @@ svg {
   background-color: var(--color-0);
   border: var(--border);
   box-shadow: var(--box-shadow);
+  z-index: 9999;
 }
 
 
